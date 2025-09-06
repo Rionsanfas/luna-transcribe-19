@@ -92,6 +92,249 @@ export type Database = {
         }
         Relationships: []
       }
+      subtitle_presets: {
+        Row: {
+          active_word_highlight: boolean
+          animation_delay: number | null
+          animation_duration: number | null
+          animation_type: Database["public"]["Enums"]["animation_type"]
+          background_color: string | null
+          background_opacity: number | null
+          border_radius: number | null
+          created_at: string | null
+          custom_x: number | null
+          custom_y: number | null
+          deleted_at: string | null
+          description: string | null
+          font_family: string
+          font_size: number
+          font_weight: string
+          has_background: boolean
+          highlight_color: string | null
+          horizontal_ratio_offset: number | null
+          id: string
+          is_default: boolean
+          is_public: boolean
+          line_spacing: number | null
+          max_width: number | null
+          name: string
+          position: Database["public"]["Enums"]["subtitle_position"]
+          primary_color: string
+          ratio_adaptive: boolean
+          secondary_color: string | null
+          style_type: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow: boolean
+          updated_at: string | null
+          usage_count: number
+          user_id: string
+          vertical_ratio_offset: number | null
+          word_emphasis: boolean
+        }
+        Insert: {
+          active_word_highlight?: boolean
+          animation_delay?: number | null
+          animation_duration?: number | null
+          animation_type?: Database["public"]["Enums"]["animation_type"]
+          background_color?: string | null
+          background_opacity?: number | null
+          border_radius?: number | null
+          created_at?: string | null
+          custom_x?: number | null
+          custom_y?: number | null
+          deleted_at?: string | null
+          description?: string | null
+          font_family?: string
+          font_size?: number
+          font_weight?: string
+          has_background?: boolean
+          highlight_color?: string | null
+          horizontal_ratio_offset?: number | null
+          id?: string
+          is_default?: boolean
+          is_public?: boolean
+          line_spacing?: number | null
+          max_width?: number | null
+          name: string
+          position?: Database["public"]["Enums"]["subtitle_position"]
+          primary_color?: string
+          ratio_adaptive?: boolean
+          secondary_color?: string | null
+          style_type?: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow?: boolean
+          updated_at?: string | null
+          usage_count?: number
+          user_id: string
+          vertical_ratio_offset?: number | null
+          word_emphasis?: boolean
+        }
+        Update: {
+          active_word_highlight?: boolean
+          animation_delay?: number | null
+          animation_duration?: number | null
+          animation_type?: Database["public"]["Enums"]["animation_type"]
+          background_color?: string | null
+          background_opacity?: number | null
+          border_radius?: number | null
+          created_at?: string | null
+          custom_x?: number | null
+          custom_y?: number | null
+          deleted_at?: string | null
+          description?: string | null
+          font_family?: string
+          font_size?: number
+          font_weight?: string
+          has_background?: boolean
+          highlight_color?: string | null
+          horizontal_ratio_offset?: number | null
+          id?: string
+          is_default?: boolean
+          is_public?: boolean
+          line_spacing?: number | null
+          max_width?: number | null
+          name?: string
+          position?: Database["public"]["Enums"]["subtitle_position"]
+          primary_color?: string
+          ratio_adaptive?: boolean
+          secondary_color?: string | null
+          style_type?: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow?: boolean
+          updated_at?: string | null
+          usage_count?: number
+          user_id?: string
+          vertical_ratio_offset?: number | null
+          word_emphasis?: boolean
+        }
+        Relationships: []
+      }
+      subtitle_styles: {
+        Row: {
+          active_word_highlight: boolean
+          animation_delay: number | null
+          animation_duration: number | null
+          animation_type: Database["public"]["Enums"]["animation_type"]
+          background_color: string | null
+          background_opacity: number | null
+          border_radius: number | null
+          created_at: string | null
+          custom_x: number | null
+          custom_y: number | null
+          font_family: string
+          font_size: number
+          font_weight: string
+          has_background: boolean
+          highlight_color: string | null
+          horizontal_ratio_offset: number | null
+          id: string
+          line_spacing: number | null
+          max_width: number | null
+          position: Database["public"]["Enums"]["subtitle_position"]
+          preset_id: string | null
+          preset_name: string | null
+          primary_color: string
+          ratio_adaptive: boolean
+          secondary_color: string | null
+          style_type: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow: boolean
+          updated_at: string | null
+          user_id: string
+          vertical_ratio_offset: number | null
+          video_aspect_ratio:
+            | Database["public"]["Enums"]["video_aspect_ratio"]
+            | null
+          video_job_id: string
+          word_emphasis: boolean
+        }
+        Insert: {
+          active_word_highlight?: boolean
+          animation_delay?: number | null
+          animation_duration?: number | null
+          animation_type?: Database["public"]["Enums"]["animation_type"]
+          background_color?: string | null
+          background_opacity?: number | null
+          border_radius?: number | null
+          created_at?: string | null
+          custom_x?: number | null
+          custom_y?: number | null
+          font_family?: string
+          font_size?: number
+          font_weight?: string
+          has_background?: boolean
+          highlight_color?: string | null
+          horizontal_ratio_offset?: number | null
+          id?: string
+          line_spacing?: number | null
+          max_width?: number | null
+          position?: Database["public"]["Enums"]["subtitle_position"]
+          preset_id?: string | null
+          preset_name?: string | null
+          primary_color?: string
+          ratio_adaptive?: boolean
+          secondary_color?: string | null
+          style_type?: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow?: boolean
+          updated_at?: string | null
+          user_id: string
+          vertical_ratio_offset?: number | null
+          video_aspect_ratio?:
+            | Database["public"]["Enums"]["video_aspect_ratio"]
+            | null
+          video_job_id: string
+          word_emphasis?: boolean
+        }
+        Update: {
+          active_word_highlight?: boolean
+          animation_delay?: number | null
+          animation_duration?: number | null
+          animation_type?: Database["public"]["Enums"]["animation_type"]
+          background_color?: string | null
+          background_opacity?: number | null
+          border_radius?: number | null
+          created_at?: string | null
+          custom_x?: number | null
+          custom_y?: number | null
+          font_family?: string
+          font_size?: number
+          font_weight?: string
+          has_background?: boolean
+          highlight_color?: string | null
+          horizontal_ratio_offset?: number | null
+          id?: string
+          line_spacing?: number | null
+          max_width?: number | null
+          position?: Database["public"]["Enums"]["subtitle_position"]
+          preset_id?: string | null
+          preset_name?: string | null
+          primary_color?: string
+          ratio_adaptive?: boolean
+          secondary_color?: string | null
+          style_type?: Database["public"]["Enums"]["subtitle_style_type"]
+          text_shadow?: boolean
+          updated_at?: string | null
+          user_id?: string
+          vertical_ratio_offset?: number | null
+          video_aspect_ratio?:
+            | Database["public"]["Enums"]["video_aspect_ratio"]
+            | null
+          video_job_id?: string
+          word_emphasis?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtitle_styles_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "subtitle_presets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subtitle_styles_video_job_id_fkey"
+            columns: ["video_job_id"]
+            isOneToOne: true
+            referencedRelation: "video_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       token_transactions: {
         Row: {
           amount: number
@@ -184,6 +427,65 @@ export type Database = {
         }
         Relationships: []
       }
+      video_subtitles: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          duration: number | null
+          end_time: number
+          id: string
+          manual_edit: boolean
+          speaker_id: string | null
+          start_time: number
+          style_override: Json | null
+          text: string
+          updated_at: string | null
+          verified: boolean
+          video_job_id: string
+          words: Json | null
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          duration?: number | null
+          end_time: number
+          id?: string
+          manual_edit?: boolean
+          speaker_id?: string | null
+          start_time: number
+          style_override?: Json | null
+          text: string
+          updated_at?: string | null
+          verified?: boolean
+          video_job_id: string
+          words?: Json | null
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          duration?: number | null
+          end_time?: number
+          id?: string
+          manual_edit?: boolean
+          speaker_id?: string | null
+          start_time?: number
+          style_override?: Json | null
+          text?: string
+          updated_at?: string | null
+          verified?: boolean
+          video_job_id?: string
+          words?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_subtitles_video_job_id_fkey"
+            columns: ["video_job_id"]
+            isOneToOne: false
+            referencedRelation: "video_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -192,7 +494,22 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      animation_type:
+        | "none"
+        | "fade"
+        | "slide"
+        | "pop"
+        | "typewriter"
+        | "bounce"
+      job_status:
+        | "pending"
+        | "processing"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      subtitle_position: "top" | "middle" | "bottom" | "custom"
+      subtitle_style_type: "classy" | "normal"
+      video_aspect_ratio: "16:9" | "9:16" | "4:3" | "1:1" | "custom"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -319,6 +636,12 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      animation_type: ["none", "fade", "slide", "pop", "typewriter", "bounce"],
+      job_status: ["pending", "processing", "completed", "failed", "cancelled"],
+      subtitle_position: ["top", "middle", "bottom", "custom"],
+      subtitle_style_type: ["classy", "normal"],
+      video_aspect_ratio: ["16:9", "9:16", "4:3", "1:1", "custom"],
+    },
   },
 } as const
