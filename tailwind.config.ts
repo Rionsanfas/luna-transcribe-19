@@ -13,6 +13,11 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        'fredoka': ['Fredoka', 'system-ui', 'sans-serif'],
+        'motley': ['Comfortaa', 'Fredoka', 'cursive'],
+        'sans': ['system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -22,6 +27,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -46,6 +52,7 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+          glass: "hsl(var(--card-glass))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -80,10 +87,38 @@ export default {
             height: "0",
           },
         },
+        glow: {
+          '0%': { 'box-shadow': '0 0 20px hsl(var(--primary-glow) / 0.2)' },
+          '100%': { 'box-shadow': '0 0 40px hsl(var(--primary-glow) / 0.4)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-up': {
+          '0%': { opacity: '0', transform: 'translateY(30px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      boxShadow: {
+        'glow-soft': 'var(--glow-soft)',
+        'glow-strong': 'var(--glow-strong)',
+        'glass': '0 8px 32px 0 hsl(0 0% 0% / 0.1)',
+      },
+      backdropBlur: {
+        'xs': '2px',
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "glow": "glow 2s ease-in-out infinite alternate",
+        "float": "float 3s ease-in-out infinite",
+        "fade-in": "fade-in 0.6s var(--ease-out-expo)",
+        "slide-up": "slide-up 0.8s var(--ease-out-expo)",
       },
     },
   },
