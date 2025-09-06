@@ -1,65 +1,167 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Star, Zap } from "lucide-react";
 
-const plans = [
+const monthlyPlans = [
   {
-    name: "Starter",
-    price: "$9",
+    name: "Basic",
+    price: "$19.99",
     period: "/month",
-    tokens: "10,000 tokens",
-    description: "Perfect for individuals and small projects",
+    tokens: "100 tokens",
+    description: "Ideal for individual users or small creators",
     features: [
-      "10,000 processing tokens/month",
-      "Up to 5 hours of audio",
-      "10 languages supported",
-      "Standard processing speed",
-      "Basic export formats (SRT, TXT)",
-      "Email support"
+      "100 tokens/month",
+      "Video transcription and translation",
+      "25 languages supported",
+      "Secure video storage",
+      "Basic support",
+      "Unused tokens don't expire"
     ],
-    popular: false
+    popular: false,
+    productId: "81152fa6-ca1a-465f-9c3d-384dc8c6a8a9",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_kMANTyyNaBCkcfUo1aJ5uKu2DkhBF4ipQYJem43NY6W"
   },
   {
-    name: "Professional",
-    price: "$29",
-    period: "/month", 
-    tokens: "50,000 tokens",
-    description: "Ideal for content creators and businesses",
+    name: "Pro",
+    price: "$99.99",
+    period: "/month",
+    tokens: "500 tokens",
+    description: "Suited for growing creators or small businesses",
     features: [
-      "50,000 processing tokens/month",
-      "Up to 30 hours of audio",
-      "50+ languages supported",
-      "Priority processing (5x faster)",
-      "All export formats (SRT, VTT, TXT)",
-      "Real-time generation",
-      "Custom vocabulary",
-      "Priority support"
+      "500 tokens/month",
+      "All Basic features",
+      "Priority support",
+      "Custom subtitle styling",
+      "Font, size, position options",
+      "Advanced processing"
     ],
-    popular: true
+    popular: true,
+    productId: "fafc1617-826a-4f61-ba37-3fe0a1dce8d9",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_Tliw1m9lc7bcQ3EfSWBenC5i2s22ujnKHy26r0pfiil"
   },
   {
-    name: "Enterprise",
-    price: "$99",
+    name: "Premium",
+    price: "$359.99",
     period: "/month",
-    tokens: "200,000 tokens",
-    description: "For large teams and high-volume usage",
+    tokens: "1,800 tokens",
+    description: "Designed for professional users or businesses",
     features: [
-      "200,000 processing tokens/month",
-      "Unlimited audio processing",
-      "All languages + dialects",
-      "Ultra-fast processing (10x)",
-      "Custom integrations & API",
-      "Bulk processing tools",
-      "Advanced analytics",
+      "1,800 tokens/month",
+      "All Pro features",
+      "Enhanced processing speed",
+      "Advanced customization options",
+      "Priority processing queue",
+      "Dedicated support"
+    ],
+    popular: false,
+    productId: "e2a82b41-2a06-46b9-84ea-d196f758f2b2",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_Y3Znzem1OYAsPCF3hSxP6dkoG44iYrKgPAHic1MjMOi"
+  },
+  {
+    name: "Custom",
+    price: "Variable",
+    period: "",
+    tokens: "Variable tokens",
+    description: "Tailored for enterprises or high-volume users",
+    features: [
+      "Flexible token allocation",
+      "Personalized support",
+      "Custom integrations",
+      "Enterprise SLA",
       "Dedicated account manager",
-      "SLA guarantee"
+      "Custom pricing negotiation"
     ],
-    popular: false
+    popular: false,
+    productId: "dbf10011-1973-4639-9723-81fd8d4f96c1",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_6vL2qZ4pIDPkzWZsXAeHcIFYlojx5TJKvklIW1UMhPO"
+  }
+];
+
+const yearlyPlans = [
+  {
+    name: "Basic",
+    price: "$238.99",
+    period: "/year",
+    tokens: "1,200 tokens",
+    description: "Ideal for individual users or small creators",
+    features: [
+      "1,200 tokens/year",
+      "Video transcription and translation",
+      "25 languages supported",
+      "Secure video storage",
+      "Basic support",
+      "20% yearly savings"
+    ],
+    popular: false,
+    productId: "64da80d5-3fe4-4a76-84d0-e56c607ffe61",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_sHe3MBHYXlwezDiO7cAj8ZnRQTtD6MhE7pwgy0H05YD"
+  },
+  {
+    name: "Pro",
+    price: "$1,198.99",
+    period: "/year",
+    tokens: "6,000 tokens",
+    description: "Suited for growing creators or small businesses",
+    features: [
+      "6,000 tokens/year",
+      "All Basic features",
+      "Priority support",
+      "Custom subtitle styling",
+      "Font, size, position options",
+      "20% yearly savings"
+    ],
+    popular: true,
+    productId: "2540c60b-9ef0-4c22-a1ce-7c2ab2ba9fda",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_m2n4kxBPT0WBtyNKWHo6wN05Wk7QmNMfkx6eU0zkM4k"
+  },
+  {
+    name: "Premium",
+    price: "$4,318.99",
+    period: "/year",
+    tokens: "21,600 tokens",
+    description: "Designed for professional users or businesses",
+    features: [
+      "21,600 tokens/year",
+      "All Pro features",
+      "Enhanced processing speed",
+      "Advanced customization options",
+      "Priority processing queue",
+      "20% yearly savings"
+    ],
+    popular: false,
+    productId: "1b319610-f033-4915-ba8a-71515342cc49",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_uRpszpsHKmwTyKLiFM1mphRQS3yKDURSGBbjY25SCSs"
+  },
+  {
+    name: "Custom",
+    price: "Variable",
+    period: "",
+    tokens: "Variable tokens",
+    description: "Tailored for enterprises or high-volume users",
+    features: [
+      "Flexible token allocation",
+      "Personalized support",
+      "Custom integrations",
+      "Enterprise SLA",
+      "Dedicated account manager",
+      "Custom pricing negotiation"
+    ],
+    popular: false,
+    productId: "91e74ded-3e16-4511-b299-f10b35778870",
+    checkoutUrl: "https://buy.polar.sh/polar_cl_feKNJww7PMRcA7VKxkoBDjRNfkFML4GTihGaE1riZkm"
   }
 ];
 
 export const Pricing = () => {
+  const [isYearly, setIsYearly] = useState(false);
+  const currentPlans = isYearly ? yearlyPlans : monthlyPlans;
+
+  const handleGetStarted = (checkoutUrl: string) => {
+    window.open(checkoutUrl, '_blank');
+  };
+
   return (
     <section className="py-20 px-4 relative">
       <div className="max-w-7xl mx-auto">
@@ -71,10 +173,35 @@ export const Pricing = () => {
             Pay only for what you use with our transparent token system. 
             Powered by Polar.sh for seamless billing and token management.
           </p>
+          
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center gap-4 mt-8">
+            <span className={`text-sm font-medium ${!isYearly ? 'text-primary' : 'text-muted-foreground'}`}>
+              Monthly
+            </span>
+            <button
+              onClick={() => setIsYearly(!isYearly)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isYearly ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isYearly ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${isYearly ? 'text-primary' : 'text-muted-foreground'}`}>
+              Yearly
+              <Badge className="ml-2 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                20% OFF
+              </Badge>
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan, index) => (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+          {currentPlans.map((plan, index) => (
             <GlassCard 
               key={index}
               variant={plan.popular ? "glow" : "hover"}
@@ -110,6 +237,7 @@ export const Pricing = () => {
                 size="lg" 
                 variant={plan.popular ? "default" : "outline"}
                 className="w-full mb-6 font-fredoka font-medium rounded-xl"
+                onClick={() => handleGetStarted(plan.checkoutUrl)}
               >
                 Get Started
               </Button>
