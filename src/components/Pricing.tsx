@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Star, Zap } from "lucide-react";
+import Spline from '@splinetool/react-spline';
 const monthlyPlans = [{
   name: "Basic",
   price: "$19.99",
@@ -91,8 +92,15 @@ export const Pricing = () => {
   const handleGetStarted = (checkoutUrl: string) => {
     window.open(checkoutUrl, '_blank');
   };
-  return <section className="py-20 px-4 relative">
-      <div className="max-w-7xl mx-auto">
+  return <section className="py-20 px-4 relative overflow-hidden">
+      {/* 3D Spline Background Animation */}
+      <div className="absolute inset-0 z-0 opacity-30">
+        <Spline
+          scene="https://prod.spline.design/AUQCBN96aHmHNBtu/scene.splinecode" 
+        />
+      </div>
+      
+      <div className="relative z-10 max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="font-fredoka text-4xl md:text-5xl font-bold mb-4">
             Simple Token-Based Pricing
