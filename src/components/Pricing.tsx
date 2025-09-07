@@ -94,10 +94,12 @@ export const Pricing = () => {
   };
   return <section className="py-20 px-4 relative overflow-hidden">
       {/* 3D Spline Background Animation */}
-      <div className="absolute inset-0 z-0 opacity-30">
-        <Spline
-          scene="https://prod.spline.design/AUQCBN96aHmHNBtu/scene.splinecode" 
-        />
+      <div className="absolute inset-0 z-0 opacity-40">
+        <div className="absolute bottom-0 left-0 w-full h-full transform translate-y-1/2 scale-150">
+          <Spline
+            scene="https://prod.spline.design/pUhUJc71iyzsjaFZ/scene.splinecode" 
+          />
+        </div>
       </div>
       
       <div className="relative z-10 max-w-7xl mx-auto">
@@ -128,7 +130,7 @@ export const Pricing = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-          {currentPlans.map((plan, index) => <GlassCard key={index} variant={plan.popular ? "glow" : "hover"} className={`relative ${plan.popular ? 'scale-105 shadow-glow-strong' : ''}`} style={{
+          {currentPlans.map((plan, index) => <GlassCard key={index} variant={plan.popular ? "glow" : "hover"} className={`relative transition-all duration-500 hover:scale-105 ${plan.popular ? 'scale-105 shadow-glow-strong border-primary/20' : 'hover:shadow-glow-soft'} rounded-3xl p-8`} style={{
           animationDelay: `${index * 150}ms`,
           animation: 'slide-up 0.8s var(--ease-out-expo) forwards'
         }}>

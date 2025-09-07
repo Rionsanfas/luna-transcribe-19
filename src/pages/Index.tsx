@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TopNavigation } from "@/components/TopNavigation";
 import { Hero } from "@/components/Hero";
 import { Features } from "@/components/Features";
 import { Pricing } from "@/components/Pricing";
@@ -22,20 +23,27 @@ const Index = () => {
       {/* Landing Page Sections */}
       {!showDashboard && (
         <>
-          <Hero />
-          <div className="text-center py-8">
-            <Button 
-              size="lg" 
-              onClick={() => setShowDashboard(true)}
-              className="font-fredoka font-medium text-lg px-8 py-4 rounded-2xl"
-            >
-              Open Dashboard
-              <ChevronDown className="ml-2 h-5 w-5" />
-            </Button>
+          <TopNavigation />
+          <div className="pt-16"> {/* Add padding for fixed nav */}
+            <Hero />
+            <div className="text-center py-8">
+              <Button 
+                size="lg" 
+                onClick={() => setShowDashboard(true)}
+                className="font-fredoka font-medium text-lg px-8 py-4 rounded-2xl"
+              >
+                Open Dashboard
+                <ChevronDown className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+            <section id="features">
+              <Features />
+            </section>
+            <section id="pricing">
+              <Pricing />
+            </section>
+            <Footer />
           </div>
-          <Features />
-          <Pricing />
-          <Footer />
         </>
       )}
 

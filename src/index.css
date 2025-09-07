@@ -130,7 +130,7 @@
     position: relative;
   }
   
-  /* Grainy texture overlay */
+  /* Fine noise texture overlay - small dots pattern */
   body::before {
     content: '';
     position: fixed;
@@ -142,9 +142,9 @@
     pointer-events: none;
     z-index: 1;
     background-image: 
-      radial-gradient(circle at 20% 50%, transparent 20%, hsl(0 0% 0% / 0.3) 21%, hsl(0 0% 0% / 0.3) 34%, transparent 35%),
-      linear-gradient(0deg, transparent 24%, hsl(0 0% 100% / 0.1) 25%, hsl(0 0% 100% / 0.1) 26%, transparent 27%, transparent 74%, hsl(0 0% 100% / 0.1) 75%, hsl(0 0% 100% / 0.1) 76%, transparent 77%, transparent),
-      linear-gradient(90deg, transparent 24%, hsl(0 0% 100% / 0.05) 25%, hsl(0 0% 100% / 0.05) 26%, transparent 27%, transparent 74%, hsl(0 0% 100% / 0.05) 75%, hsl(0 0% 100% / 0.05) 76%, transparent 77%, transparent);
-    background-size: 75px 75px, 4px 4px, 4px 4px;
+      radial-gradient(circle at 1px 1px, hsl(0 0% 0% / 0.15) 1px, transparent 0),
+      radial-gradient(circle at 2px 2px, hsl(0 0% 100% / 0.08) 1px, transparent 0);
+    background-size: 8px 8px, 12px 12px;
+    background-position: 0 0, 4px 6px;
   }
 }

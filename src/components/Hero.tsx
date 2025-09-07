@@ -7,14 +7,14 @@ export const Hero = () => {
   return (
     <section className="min-h-screen flex items-center justify-center px-4 py-20 relative overflow-hidden">
       {/* 3D Spline Background Animation */}
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 pointer-events-none">
         <Spline
           scene="https://prod.spline.design/Z8nNT2-vDbtY8ZP7/scene.splinecode" 
         />
       </div>
       
       {/* Hero content */}
-      <div className="relative z-10 max-w-7xl mx-auto text-center">
+      <div className="relative z-10 max-w-7xl mx-auto text-center pointer-events-auto">
         <div className="animate-fade-in">
           <h1 className="font-fredoka font-bold text-6xl md:text-8xl lg:text-9xl mb-4 bg-gradient-to-r from-foreground via-muted-foreground to-foreground bg-clip-text text-transparent">
             Transform Video to Subtitles
