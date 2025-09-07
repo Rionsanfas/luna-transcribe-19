@@ -128,6 +128,8 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     position: relative;
+    max-width: 90vw;
+    margin: 0 auto;
   }
   
   /* Fine noise texture overlay - small dots pattern */

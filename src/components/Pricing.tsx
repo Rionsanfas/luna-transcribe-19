@@ -93,23 +93,22 @@ export const Pricing = () => {
     window.open(checkoutUrl, '_blank');
   };
   return <section className="py-20 px-4 relative overflow-hidden">
-      {/* 3D Spline Background Animation */}
-      <div className="absolute inset-0 z-0 opacity-70">
-        <div className="absolute top-1/4 right-0 w-3/4 h-3/4 scale-125">
+      {/* 3D Spline Background Animation - Interactive */}
+      <div className="absolute inset-0 z-10 opacity-70 pointer-events-auto">
+        <div className="absolute top-1/4 right-0 w-3/4 h-3/4 scale-150">
           <Spline
             scene="https://prod.spline.design/pUhUJc71iyzsjaFZ/scene.splinecode" 
           />
         </div>
       </div>
       
-      <div className="relative z-10 max-w-7xl mx-auto">
+      <div className="relative z-20 max-w-5xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="font-fredoka text-4xl md:text-5xl font-bold mb-4">
-            Simple Token-Based Pricing
+          <h2 className="text-3xl md:text-4xl font-fredoka font-bold mb-6">
+            Choose Your <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Plan</span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Pay only for what you use with our transparent token system. 
-            Powered by Polar.sh for seamless billing and token management.
+          <p className="text-lg text-muted-foreground mb-8">
+            Get started with our flexible pricing options designed for every need
           </p>
           
           {/* Billing Toggle */}
