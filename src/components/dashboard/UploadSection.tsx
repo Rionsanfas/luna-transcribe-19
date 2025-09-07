@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useVideoEditing } from "@/contexts/VideoEditingContext";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +11,14 @@ import {
   Clock,
   Play,
   FileVideo,
-  Plus
+  Plus,
+  Loader2
 } from "lucide-react";
 
 export const UploadSection = () => {
   const [dragOver, setDragOver] = useState(false);
+  const { currentVideo, setCurrentVideo, isProcessing, generateSubtitles } = useVideoEditing();
+  const { toast } = useToast();
 
   const recentProjects = [
     { name: "Product Demo Video", duration: "2:34", lastEdited: "2 hours ago", thumbnail: "/placeholder.svg" },
@@ -34,7 +39,39 @@ export const UploadSection = () => {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
-    // Handle file drop logic
+    
+    const files = Array.from(e.dataTransfer.files);
+    const videoFile = files.find(file => file.type.startsWith('video/'));
+    
+    if (videoFile) {
+      handleVideoUpload(videoFile);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type.startsWith('video/')) {
+      handleVideoUpload(file);
+    }
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    setCurrentVideo(file);
+    toast({
+      title: "Video uploaded",
+      description: `${file.name} has been uploaded successfully`
+    });
+    
+    // Auto-generate subtitles
+    try {
+      await generateSubtitles();
+    } catch (error) {
+      toast({
+        title: "Subtitle generation failed",
+        description: "There was an error generating subtitles",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -51,17 +88,41 @@ export const UploadSection = () => {
         >
           <div className="text-center py-8">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-              <Upload className="w-8 h-8 text-primary" />
+              {isProcessing ? (
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              ) : (
+                <Upload className="w-8 h-8 text-primary" />
+              )}
             </div>
-            <h3 className="text-lg font-semibold mb-2">Upload Your Video</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              {currentVideo ? currentVideo.name : "Upload Your Video"}
+            </h3>
             <p className="text-muted-foreground mb-4">
-              Drop your MP4, MOV, or other video files here, or click to browse
+              {isProcessing 
+                ? "Processing video and generating subtitles..." 
+                : currentVideo 
+                  ? "Video uploaded successfully. AI subtitles are being generated."
+                  : "Drop your MP4, MOV, or other video files here, or click to browse"
+              }
             </p>
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-              <Button className="flex items-center gap-2">
-                <Video className="w-4 h-4" />
-                Choose Video File
-              </Button>
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  disabled={isProcessing}
+                />
+                <Button 
+                  className="flex items-center gap-2" 
+                  disabled={isProcessing}
+                  type="button"
+                >
+                  <Video className="w-4 h-4" />
+                  {currentVideo ? "Change Video" : "Choose Video File"}
+                </Button>
+              </label>
               <Button variant="outline" className="flex items-center gap-2">
                 <Image className="w-4 h-4" />
                 Style Reference (Optional)

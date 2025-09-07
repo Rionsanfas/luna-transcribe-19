@@ -34,9 +34,9 @@ export const DashboardNav = () => {
         {/* Logo */}
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">V</span>
+            <span className="text-primary-foreground font-bold text-sm">S</span>
           </div>
-          <span className="font-fredoka text-xl font-semibold">VoiceScript AI</span>
+          <span className="font-fredoka text-xl font-semibold">SubAI</span>
         </div>
 
         {/* Navigation Links */}

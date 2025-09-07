@@ -13,7 +13,7 @@ export const Hero = () => {
       <div className="relative z-10 max-w-7xl mx-auto text-center">
         <div className="animate-fade-in">
           <h1 className="font-fredoka font-bold text-5xl md:text-7xl lg:text-8xl mb-6 bg-gradient-to-r from-foreground via-muted-foreground to-foreground bg-clip-text text-transparent">
-            VoiceScript
+            SubAI
             <span className="font-motley block text-4xl md:text-5xl lg:text-6xl mt-2 opacity-80">
               AI Subtitles
             </span>

@@ -8,7 +8,7 @@ export const Footer = () => {
       <div className="max-w-7xl mx-auto">
         <GlassCard variant="default" className="text-center">
           <div className="mb-8">
-            <h2 className="font-fredoka text-3xl font-bold mb-2">VoiceScript AI</h2>
+            <h2 className="font-fredoka text-3xl font-bold mb-2">SubAI</h2>
             <p className="text-muted-foreground">
               Transform voice to professional subtitles with AI
             </p>
@@ -65,7 +65,7 @@ export const Footer = () => {
 
           <div className="border-t border-border pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <span>© 2024 VoiceScript AI. Made with</span>
+              <span>© 2024 SubAI. Made with</span>
               <Heart className="h-3 w-3 text-red-500" />
               <span>using AI technology</span>
             </div>

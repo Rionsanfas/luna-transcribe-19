@@ -8,6 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useVideoEditing } from "@/contexts/VideoEditingContext";
+import { useToast } from "@/hooks/use-toast";
 import {
   ChevronDown,
   ChevronLeft,
@@ -16,7 +18,8 @@ import {
   Type,
   Palette,
   Download,
-  Settings
+  Settings,
+  Loader2
 } from "lucide-react";
 
 interface EditingPanelsProps {
@@ -29,6 +32,47 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
   const [subtitlesOpen, setSubtitlesOpen] = useState(true);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  
+  const {
+    subtitleSettings,
+    customizationSettings,
+    cropSettings,
+    exportSettings,
+    currentVideo,
+    isProcessing,
+    updateSubtitleSettings,
+    updateCustomizationSettings,
+    updateCropSettings,
+    updateExportSettings,
+    exportVideo
+  } = useVideoEditing();
+  
+  const { toast } = useToast();
+
+  const handleExport = async () => {
+    if (!currentVideo) {
+      toast({
+        title: "No video selected",
+        description: "Please upload a video first",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      await exportVideo();
+      toast({
+        title: "Export successful",
+        description: "Your video has been processed and exported"
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your video",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (collapsed) {
     return (
@@ -74,7 +118,10 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
           <CollapsibleContent className="px-4 pb-4 space-y-4">
             <div>
               <Label className="text-sm">Aspect Ratio</Label>
-              <Select defaultValue="16:9">
+              <Select 
+                value={cropSettings.aspectRatio} 
+                onValueChange={(value) => updateCropSettings({ aspectRatio: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -89,11 +136,25 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
             </div>
             <div>
               <Label className="text-sm">Horizontal Offset</Label>
-              <Slider defaultValue={[0]} max={100} min={-100} step={1} className="mt-2" />
+              <Slider 
+                value={[cropSettings.horizontalOffset]} 
+                onValueChange={([value]) => updateCropSettings({ horizontalOffset: value })}
+                max={100} 
+                min={-100} 
+                step={1} 
+                className="mt-2" 
+              />
             </div>
             <div>
               <Label className="text-sm">Vertical Offset</Label>
-              <Slider defaultValue={[0]} max={100} min={-100} step={1} className="mt-2" />
+              <Slider 
+                value={[cropSettings.verticalOffset]} 
+                onValueChange={([value]) => updateCropSettings({ verticalOffset: value })}
+                max={100} 
+                min={-100} 
+                step={1} 
+                className="mt-2" 
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -114,34 +175,65 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
           <CollapsibleContent className="px-4 pb-4 space-y-4">
             <div>
               <Label className="text-sm">Position Offset</Label>
-              <Slider defaultValue={[50]} max={100} step={1} className="mt-2" />
+              <Slider 
+                value={[subtitleSettings.positionOffset]} 
+                onValueChange={([value]) => updateSubtitleSettings({ positionOffset: value })}
+                max={100} 
+                step={1} 
+                className="mt-2" 
+              />
             </div>
             <div>
               <Label className="text-sm">Max Width</Label>
-              <Slider defaultValue={[80]} max={100} step={1} className="mt-2" />
+              <Slider 
+                value={[subtitleSettings.maxWidth]} 
+                onValueChange={([value]) => updateSubtitleSettings({ maxWidth: value })}
+                max={100} 
+                step={1} 
+                className="mt-2" 
+              />
             </div>
             <div>
               <Label className="text-sm">Line Height</Label>
-              <Slider defaultValue={[120]} min={100} max={200} step={10} className="mt-2" />
+              <Slider 
+                value={[subtitleSettings.lineHeight]} 
+                onValueChange={([value]) => updateSubtitleSettings({ lineHeight: value })}
+                min={100} 
+                max={200} 
+                step={10} 
+                className="mt-2" 
+              />
             </div>
             
             {/* Toggle Options */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Animations</Label>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={subtitleSettings.animations} 
+                  onCheckedChange={(checked) => updateSubtitleSettings({ animations: checked })}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Background</Label>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={subtitleSettings.background} 
+                  onCheckedChange={(checked) => updateSubtitleSettings({ background: checked })}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Active Word Highlight</Label>
-                <Switch />
+                <Switch 
+                  checked={subtitleSettings.activeWordHighlight} 
+                  onCheckedChange={(checked) => updateSubtitleSettings({ activeWordHighlight: checked })}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Text Shadow</Label>
-                <Switch defaultChecked />
+                <Switch 
+                  checked={subtitleSettings.textShadow} 
+                  onCheckedChange={(checked) => updateSubtitleSettings({ textShadow: checked })}
+                />
               </div>
             </div>
 
@@ -149,7 +241,10 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Text Amount Display</Label>
-              <Select defaultValue="auto">
+              <Select 
+                value={subtitleSettings.textAmountDisplay} 
+                onValueChange={(value: any) => updateSubtitleSettings({ textAmountDisplay: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -164,7 +259,13 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Background Transparency</Label>
-              <Slider defaultValue={[80]} max={100} step={5} className="mt-2" />
+              <Slider 
+                value={[subtitleSettings.backgroundTransparency]} 
+                onValueChange={([value]) => updateSubtitleSettings({ backgroundTransparency: value })}
+                max={100} 
+                step={5} 
+                className="mt-2" 
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>
@@ -185,7 +286,10 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
           <CollapsibleContent className="px-4 pb-4 space-y-4">
             <div>
               <Label className="text-sm">Font Family</Label>
-              <Select defaultValue="fredoka">
+              <Select 
+                value={customizationSettings.fontFamily} 
+                onValueChange={(value) => updateCustomizationSettings({ fontFamily: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -201,7 +305,10 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Font Variant</Label>
-              <Select defaultValue="regular">
+              <Select 
+                value={customizationSettings.fontVariant} 
+                onValueChange={(value) => updateCustomizationSettings({ fontVariant: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -216,28 +323,54 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Font Size</Label>
-              <Input type="number" defaultValue="24" className="mt-1" />
+              <Input 
+                type="number" 
+                value={customizationSettings.fontSize} 
+                onChange={(e) => updateCustomizationSettings({ fontSize: parseInt(e.target.value) || 24 })}
+                className="mt-1" 
+              />
             </div>
 
             <div>
               <Label className="text-sm">Text Color</Label>
               <div className="flex gap-2 mt-2">
-                <div className="w-8 h-8 rounded-full bg-white border-2 border-border cursor-pointer" />
-                <div className="w-8 h-8 rounded-full bg-black cursor-pointer" />
-                <div className="w-8 h-8 rounded-full bg-yellow-400 cursor-pointer" />
-                <div className="w-8 h-8 rounded-full bg-red-500 cursor-pointer" />
+                <div 
+                  className="w-8 h-8 rounded-full bg-white border-2 border-border cursor-pointer" 
+                  onClick={() => updateCustomizationSettings({ textColor: '#ffffff' })}
+                />
+                <div 
+                  className="w-8 h-8 rounded-full bg-black cursor-pointer" 
+                  onClick={() => updateCustomizationSettings({ textColor: '#000000' })}
+                />
+                <div 
+                  className="w-8 h-8 rounded-full bg-yellow-400 cursor-pointer" 
+                  onClick={() => updateCustomizationSettings({ textColor: '#facc15' })}
+                />
+                <div 
+                  className="w-8 h-8 rounded-full bg-red-500 cursor-pointer" 
+                  onClick={() => updateCustomizationSettings({ textColor: '#ef4444' })}
+                />
                 <Button size="sm" variant="outline" className="h-8">Custom</Button>
               </div>
             </div>
 
             <div>
               <Label className="text-sm">Stroke Width</Label>
-              <Slider defaultValue={[2]} max={10} step={1} className="mt-2" />
+              <Slider 
+                value={[customizationSettings.strokeWidth]} 
+                onValueChange={([value]) => updateCustomizationSettings({ strokeWidth: value })}
+                max={10} 
+                step={1} 
+                className="mt-2" 
+              />
             </div>
 
             <div>
               <Label className="text-sm">Text Transformation</Label>
-              <Select defaultValue="none">
+              <Select 
+                value={customizationSettings.textTransformation} 
+                onValueChange={(value: any) => updateCustomizationSettings({ textTransformation: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -268,7 +401,13 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
           <CollapsibleContent className="px-4 pb-4 space-y-4">
             <div>
               <Label className="text-sm">Compression</Label>
-              <Slider defaultValue={[75]} max={100} step={5} className="mt-2" />
+              <Slider 
+                value={[exportSettings.compression]} 
+                onValueChange={([value]) => updateExportSettings({ compression: value })}
+                max={100} 
+                step={5} 
+                className="mt-2" 
+              />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>Fast</span>
                 <span>High Quality</span>
@@ -277,12 +416,21 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Quality</Label>
-              <Slider defaultValue={[85]} max={100} step={5} className="mt-2" />
+              <Slider 
+                value={[exportSettings.quality]} 
+                onValueChange={([value]) => updateExportSettings({ quality: value })}
+                max={100} 
+                step={5} 
+                className="mt-2" 
+              />
             </div>
 
             <div>
               <Label className="text-sm">Resolution</Label>
-              <Select defaultValue="1080p">
+              <Select 
+                value={exportSettings.resolution} 
+                onValueChange={(value) => updateExportSettings({ resolution: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -298,7 +446,10 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <div>
               <Label className="text-sm">Frame Rate</Label>
-              <Select defaultValue="30">
+              <Select 
+                value={exportSettings.frameRate} 
+                onValueChange={(value) => updateExportSettings({ frameRate: value })}
+              >
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -312,9 +463,23 @@ export const EditingPanels = ({ collapsed, onToggleCollapse }: EditingPanelsProp
 
             <Separator />
 
-            <Button className="w-full" size="lg">
-              <Download className="w-4 h-4 mr-2" />
-              Export Video
+            <Button 
+              className="w-full" 
+              size="lg" 
+              onClick={handleExport}
+              disabled={!currentVideo || isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Video
+                </>
+              )}
             </Button>
           </CollapsibleContent>
         </Collapsible>
