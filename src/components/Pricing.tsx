@@ -94,8 +94,8 @@ export const Pricing = () => {
   };
   return <section className="py-20 px-4 relative overflow-hidden">
       {/* 3D Spline Background Animation */}
-      <div className="absolute inset-0 z-0 opacity-40">
-        <div className="absolute bottom-0 left-0 w-full h-full transform translate-y-1/2 scale-150">
+      <div className="absolute inset-0 z-0 opacity-70">
+        <div className="absolute top-1/4 left-1/2 transform -translate-x-1/2 w-2/3 h-1/2 scale-75">
           <Spline
             scene="https://prod.spline.design/pUhUJc71iyzsjaFZ/scene.splinecode" 
           />

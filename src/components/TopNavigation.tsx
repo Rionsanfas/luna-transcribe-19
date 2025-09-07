@@ -4,20 +4,10 @@ import Spline from '@splinetool/react-spline';
 
 export const TopNavigation = () => {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
-      {/* Small top animation */}
-      <div className="absolute top-0 right-0 w-32 h-16 opacity-60 pointer-events-none">
-        <Spline
-          scene="https://prod.spline.design/pbCV2aNLv7Wsj0pv/scene.splinecode" 
-        />
-      </div>
-      
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <nav className="fixed top-4 left-4 right-4 z-50 bg-background/90 backdrop-blur-md border border-border/50 rounded-2xl shadow-glow-soft">
+      <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link to="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">S</span>
-          </div>
+        <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
           <span className="font-fredoka text-xl font-semibold">SubAI</span>
         </Link>
 

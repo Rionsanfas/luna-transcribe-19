@@ -24,7 +24,7 @@ const Index = () => {
       {!showDashboard && (
         <>
           <TopNavigation />
-          <div className="pt-16"> {/* Add padding for fixed nav */}
+          <div className="pt-24"> {/* Add padding for fixed nav */}
             <Hero />
             <div className="text-center py-8">
               <Button 

@@ -75,10 +75,7 @@ export const DashboardNav = () => {
     <nav className="border-b border-border/50 p-4">
       <GlassCard className="flex items-center justify-between py-3 px-6">
         {/* Logo */}
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">S</span>
-          </div>
+        <div className="flex items-center">
           <span className="font-fredoka text-xl font-semibold">SubAI</span>
         </div>
 
