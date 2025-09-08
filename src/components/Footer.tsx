@@ -8,7 +8,7 @@ export const Footer = () => {
       <div className="max-w-7xl mx-auto">
         <GlassCard variant="default" className="text-center">
           <div className="mb-8">
-            <h2 className="font-fredoka text-3xl font-bold mb-2">SubAI</h2>
+            <h2 className="font-fredoka text-3xl font-bold mb-2 text-foreground">SubAI</h2>
             <p className="text-muted-foreground">
               Transform voice to professional subtitles with AI
             </p>
@@ -28,16 +28,16 @@ export const Footer = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8 text-sm">
             <div>
-              <h4 className="font-fredoka font-semibold mb-3">Product</h4>
+              <h4 className="font-fredoka font-semibold mb-3 text-foreground">Product</h4>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Pricing</a></li>
+                <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">API</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Documentation</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-fredoka font-semibold mb-3">Company</h4>
+              <h4 className="font-fredoka font-semibold mb-3 text-foreground">Company</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
@@ -46,7 +46,7 @@ export const Footer = () => {
               </ul>
             </div>
             <div>
-              <h4 className="font-fredoka font-semibold mb-3">Support</h4>
+              <h4 className="font-fredoka font-semibold mb-3 text-foreground">Support</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li><a href="#" className="hover:text-foreground transition-colors">Help Center</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Status</a></li>
@@ -54,7 +54,7 @@ export const Footer = () => {
               </ul>
             </div>
             <div>
-              <h4 className="font-fredoka font-semibold mb-3">Legal</h4>
+              <h4 className="font-fredoka font-semibold mb-3 text-foreground">Legal</h4>
               <ul className="space-y-2 text-muted-foreground">
                 <li><a href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</a></li>
                 <li><a href="/terms" className="hover:text-foreground transition-colors">Terms of Service</a></li>

@@ -108,7 +108,7 @@ export const Pricing = () => {
       
       <div className="relative z-20 max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-fredoka font-bold mb-6">
+          <h2 className="text-4xl md:text-5xl font-fredoka font-bold mb-6 text-foreground">
             Choose Your <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Plan</span>
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -161,9 +161,9 @@ export const Pricing = () => {
               )}
               
               <div className="text-center mb-6">
-                <h3 className="font-fredoka text-2xl font-bold mb-2">{plan.name}</h3>
+                <h3 className="font-fredoka text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
                 <div className="flex items-baseline justify-center gap-1 mb-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-4xl font-bold text-foreground">{plan.price}</span>
                   <span className="text-lg text-muted-foreground">{plan.period}</span>
                 </div>
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -186,7 +186,7 @@ export const Pricing = () => {
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start gap-3">
                     <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature}</span>
+                    <span className="text-sm text-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -197,7 +197,7 @@ export const Pricing = () => {
         {/* Token explanation */}
         <div className="mt-16 text-center">
           <GlassCard className="p-6 max-w-2xl mx-auto">
-            <h3 className="font-fredoka text-xl font-bold mb-3">How Tokens Work</h3>
+            <h3 className="font-fredoka text-xl font-bold mb-3 text-foreground">How Tokens Work</h3>
             <p className="text-muted-foreground">
               1 token = 10MB of video processing. Tokens are used for AI subtitle generation and video export. 
               Unused tokens never expire, giving you complete flexibility.

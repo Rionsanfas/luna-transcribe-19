@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Coins, Menu, X } from "lucide-react";
+import { User, Coins, Menu, X, Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +27,7 @@ export const TopNavigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, signOut, tokenBalance } = useAuth();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,11 +38,45 @@ export const TopNavigation = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const handleBillingClick = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to access billing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('polar-customer-portal', {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      } else {
+        throw new Error('No portal URL received');
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open billing portal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled 
-        ? 'bg-card/95 backdrop-blur-md border-b border-border/50 py-2 shadow-lg' 
-        : 'bg-card/60 backdrop-blur-sm py-4 md:py-6'
+        ? 'bg-card/95 backdrop-blur-md border border-border/50 py-2 shadow-lg rounded-b-2xl mx-4' 
+        : 'py-4 md:py-6'
     }`}>
       <div className="container mx-auto">
         <nav className="flex items-center justify-between px-4 md:px-6">
@@ -83,14 +121,17 @@ export const TopNavigation = () => {
                     </Link>
                   )}
                   {!user && (
-                    <div className="space-y-3 pt-4">
-                      <Button variant="outline" size="lg" className="w-full" asChild>
-                        <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
-                      </Button>
-                      <Button size="lg" className="w-full" asChild>
-                        <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
-                      </Button>
-                    </div>
+                     <div className="space-y-3 pt-4">
+                       <div className="flex justify-center pb-2">
+                         <ThemeToggle />
+                       </div>
+                       <Button variant="outline" size="lg" className="w-full" asChild>
+                         <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
+                       </Button>
+                       <Button size="lg" className="w-full" asChild>
+                         <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>Get Started</Link>
+                       </Button>
+                     </div>
                   )}
                 </div>
               </SheetContent>
@@ -131,9 +172,12 @@ export const TopNavigation = () => {
           <div className="flex items-center space-x-2 md:space-x-3">
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3">
+                {/* Theme Toggle */}
+                <ThemeToggle />
+                
                 {/* Token Balance - Hidden on very small screens */}
                 <div className={`hidden sm:flex items-center space-x-1 text-sm ${
-                  isScrolled ? 'text-card-foreground/90' : 'text-muted-foreground'
+                  isScrolled ? 'text-card-foreground/90' : 'text-foreground'
                 }`}>
                   <Coins className="h-4 w-4" />
                   <span>{tokenBalance}</span>
@@ -149,9 +193,9 @@ export const TopNavigation = () => {
                       <span className="hidden md:block">{user.email?.split('@')[0]}</span>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground">
                     <div className="px-2 py-2 text-sm">
-                      <p className="font-medium">{user.email?.split('@')[0]}</p>
+                      <p className="font-medium text-foreground">{user.email?.split('@')[0]}</p>
                       <p className="text-xs text-muted-foreground">{user.email}</p>
                       <div className="flex items-center gap-1 mt-1 text-xs text-primary">
                         <Coins className="h-3 w-3" />
@@ -160,10 +204,14 @@ export const TopNavigation = () => {
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link to="/dashboard">Dashboard</Link>
+                      <Link to="/dashboard" className="text-foreground">Dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleBillingClick} className="text-foreground">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Customer Portal
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={signOut}>
+                    <DropdownMenuItem onClick={signOut} className="text-foreground">
                       Sign Out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -171,8 +219,9 @@ export const TopNavigation = () => {
               </div>
             ) : (
               <div className="flex items-center space-x-2">
+                <ThemeToggle />
                 <Button variant="ghost" size="sm" className={`min-h-[44px] ${
-                  isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : 'text-muted-foreground'
+                  isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : 'text-foreground hover:text-accent-foreground hover:bg-accent'
                 }`} asChild>
                   <Link to="/auth">Sign In</Link>
                 </Button>

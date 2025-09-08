@@ -46,7 +46,7 @@ export const Features = () => {
     <section className="py-20 px-4 relative">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="font-fredoka text-4xl md:text-5xl font-bold mb-4">
+          <h2 className="font-fredoka text-4xl md:text-5xl font-bold mb-4 text-foreground">
             Powerful AI Features
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -71,7 +71,7 @@ export const Features = () => {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-fredoka text-lg font-semibold">{feature.title}</h3>
+                    <h3 className="font-fredoka text-lg font-semibold text-foreground">{feature.title}</h3>
                   </div>
                   <Badge variant="secondary" className="mb-3 text-xs rounded-full">
                     {feature.badge}
