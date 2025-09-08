@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useVideoEditing } from "@/contexts/VideoEditingContext";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +19,10 @@ import {
 
 export const UploadSection = () => {
   const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { currentVideo, setCurrentVideo, isProcessing, generateSubtitles } = useVideoEditing();
   const { toast } = useToast();
+  const { user, tokenBalance } = useAuth();
 
   const recentProjects = [
     { name: "Product Demo Video", duration: "2:34", lastEdited: "2 hours ago", thumbnail: "/placeholder.svg" },
@@ -56,21 +60,113 @@ export const UploadSection = () => {
   };
 
   const handleVideoUpload = async (file: File) => {
-    setCurrentVideo(file);
-    toast({
-      title: "Video uploaded",
-      description: `${file.name} has been uploaded successfully`
-    });
-    
-    // Auto-generate subtitles
-    try {
-      await generateSubtitles();
-    } catch (error) {
+    if (!user) {
       toast({
-        title: "Subtitle generation failed",
-        description: "There was an error generating subtitles",
+        title: "Authentication required",
+        description: "Please log in to upload videos",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Check file type - only allow MP4 and MOV
+    if (!file.type.includes('mp4') && !file.type.includes('quicktime')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload MP4 or MOV files only",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check file size and calculate tokens needed
+    const fileSizeInMB = file.size / (1024 * 1024);
+    const tokensNeeded = Math.ceil(fileSizeInMB / 10); // 1 token = 10MB
+
+    if (tokenBalance < tokensNeeded) {
+      toast({
+        title: "Insufficient tokens",
+        description: `You need ${tokensNeeded} tokens but only have ${tokenBalance}. Please purchase more tokens.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setCurrentVideo(file);
+      setUploadProgress(10);
+
+      // Create video job record
+      const { data: videoJob, error: jobError } = await supabase
+        .from('video_jobs')
+        .insert({
+          user_id: user.id,
+          original_filename: file.name,
+          file_size_mb: Math.round(fileSizeInMB),
+          processing_type: 'subtitle_generation',
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (jobError) throw jobError;
+
+      setUploadProgress(30);
+
+      // Convert file to base64 for processing
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const base64Data = reader.result?.toString().split(',')[1];
+          
+          setUploadProgress(50);
+
+          // Call subtitle generation function
+          const { data: { session } } = await supabase.auth.getSession();
+          const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+            body: {
+              videoData: base64Data,
+              videoSize: file.size,
+              videoJobId: videoJob.id
+            },
+            headers: {
+              Authorization: `Bearer ${session?.access_token}`,
+            },
+          });
+
+          if (error) throw error;
+
+          setUploadProgress(100);
+
+          toast({
+            title: "Video processed successfully",
+            description: `Generated ${data.subtitles} subtitle segments using ${data.tokensUsed} tokens`
+          });
+
+          // Reset progress after a short delay
+          setTimeout(() => setUploadProgress(0), 2000);
+
+        } catch (error) {
+          console.error('Video processing error:', error);
+          toast({
+            title: "Processing failed",
+            description: "There was an error processing your video",
+            variant: "destructive"
+          });
+          setUploadProgress(0);
+        }
+      };
+
+      reader.readAsDataURL(file);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your video",
+        variant: "destructive"
+      });
+      setUploadProgress(0);
     }
   };
 
@@ -98,11 +194,13 @@ export const UploadSection = () => {
               {currentVideo ? currentVideo.name : "Upload Your Video"}
             </h3>
             <p className="text-muted-foreground mb-4">
-              {isProcessing 
-                ? "Processing video and generating subtitles..." 
-                : currentVideo 
-                  ? "Video uploaded successfully. AI subtitles are being generated."
-                  : "Drop your MP4, MOV, or other video files here, or click to browse"
+              {uploadProgress > 0 
+                ? `Processing video... ${uploadProgress}%`
+                : isProcessing 
+                  ? "Processing video and generating subtitles..." 
+                  : currentVideo 
+                    ? "Video uploaded successfully. AI subtitles are being generated."
+                    : "Drop your MP4 or MOV video files here, or click to browse"
               }
             </p>
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
@@ -116,7 +214,7 @@ export const UploadSection = () => {
                 />
                 <Button 
                   className="flex items-center gap-2" 
-                  disabled={isProcessing}
+                  disabled={isProcessing || uploadProgress > 0}
                   type="button"
                 >
                   <Video className="w-4 h-4" />
@@ -131,8 +229,11 @@ export const UploadSection = () => {
             <div className="flex flex-wrap justify-center gap-2 mt-4">
               <Badge variant="secondary" className="text-xs">MP4</Badge>
               <Badge variant="secondary" className="text-xs">MOV</Badge>
-              <Badge variant="secondary" className="text-xs">AVI</Badge>
-              <Badge variant="secondary" className="text-xs">MKV</Badge>
+              {tokenBalance && (
+                <Badge variant="outline" className="text-xs">
+                  {tokenBalance} tokens available
+                </Badge>
+              )}
             </div>
           </div>
         </GlassCard>

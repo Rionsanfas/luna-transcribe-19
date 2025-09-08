@@ -93,14 +93,12 @@ export const Pricing = () => {
     window.open(checkoutUrl, '_blank');
   };
   return <section className="py-20 px-4 relative overflow-hidden">
-      {/* 3D Spline Background Animation - Interactive */}
-      <div className="absolute inset-0 z-10 opacity-70 pointer-events-auto">
-        <div className="absolute top-1/4 right-0 w-3/4 h-3/4 scale-150">
+        <div className="absolute inset-0 flex items-center justify-center">
           <Spline
-            scene="https://prod.spline.design/pUhUJc71iyzsjaFZ/scene.splinecode" 
+            scene="https://prod.spline.design/6Ik3ijGEYEUWVNok/scene.splinecode"
+            className="w-full h-full opacity-30 scale-75"
           />
         </div>
-      </div>
       
       <div className="relative z-20 max-w-5xl mx-auto">
         <div className="text-center mb-16">
@@ -128,42 +126,39 @@ export const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-          {currentPlans.map((plan, index) => <GlassCard key={index} variant={plan.popular ? "glow" : "hover"} className={`relative transition-all duration-500 hover:scale-105 ${plan.popular ? 'scale-105 shadow-glow-strong border-primary/20' : 'hover:shadow-glow-soft'} rounded-3xl p-8`} style={{
-          animationDelay: `${index * 150}ms`,
-          animation: 'slide-up 0.8s var(--ease-out-expo) forwards'
-        }}>
-              {plan.popular && <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1 rounded-full font-fredoka">
-                    <Star className="h-3 w-3 mr-1" />
-                    Most Popular
-                  </Badge>
-                </div>}
-              
-              <div className="text-center mb-6">
-                <h3 className="font-fredoka text-2xl font-bold mb-2">{plan.name}</h3>
-                <div className="flex items-baseline justify-center gap-1 mb-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-lg text-muted-foreground">{plan.period}</span>
+        <div className="grid md:grid-cols-3 gap-8 relative z-10 max-w-6xl mx-auto">
+          {currentPlans.map((plan, index) => (
+            <GlassCard key={index} className="p-8 hover:scale-105 transition-transform duration-300 relative">
+              {plan.popular && (
+                <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium absolute -top-4 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                  Most Popular
                 </div>
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <Zap className="h-4 w-4 text-primary" />
-                  <span className="font-fredoka font-medium text-primary">{plan.tokens}</span>
+              )}
+              <div className="text-center mb-8">
+                <h3 className="text-3xl font-bold mb-4">{plan.name}</h3>
+                <div className="text-4xl font-bold text-primary mb-6">
+                  {plan.price}
+                  <span className="text-lg text-muted-foreground">
+                    {isYearly ? "/year" : "/month"}
+                  </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
               </div>
-
-              <Button size="lg" variant={plan.popular ? "default" : "outline"} className="w-full mb-6 font-fredoka font-medium rounded-xl" onClick={() => handleGetStarted(plan.checkoutUrl)}>
+              <ul className="space-y-4 mb-8">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-center text-base">
+                    <span className="text-primary mr-3 text-lg">✓</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90 py-3 text-lg"
+                onClick={() => handleGetStarted(plan.checkoutUrl)}
+              >
                 Get Started
               </Button>
-
-              <ul className="space-y-3">
-                {plan.features.map((feature, featureIndex) => <li key={featureIndex} className="flex items-start gap-3">
-                    <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature}</span>
-                  </li>)}
-              </ul>
-            </GlassCard>)}
+            </GlassCard>
+          ))}
         </div>
 
         {/* Token explanation */}

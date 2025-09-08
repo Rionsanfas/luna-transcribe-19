@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/use-toast";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,27 +23,38 @@ import {
   Sun
 } from "lucide-react";
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-);
-
 export const DashboardNav = () => {
   const [isDark, setIsDark] = useState(false);
   const { toast } = useToast();
+  const { user, tokenBalance, signOut } = useAuth();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('dark');
   };
 
+  useEffect(() => {
+    // Check system theme preference on mount
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    setIsDark(isDarkMode);
+  }, []);
+
   const handleBillingClick = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (!user) {
         toast({
           title: "Authentication Required",
           description: "Please log in to access billing",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Session Error",
+          description: "Please log in again to access billing",
           variant: "destructive",
         });
         return;
@@ -66,6 +78,23 @@ export const DashboardNav = () => {
       toast({
         title: "Error",
         description: "Failed to open billing portal. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully",
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
         variant: "destructive",
       });
     }
@@ -122,8 +151,9 @@ export const DashboardNav = () => {
             <DropdownMenuContent className="w-56" align="end">
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-1 leading-none">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-muted-foreground">john@example.com</p>
+                  <p className="text-sm font-medium">{user?.email?.split('@')[0] || 'User'}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <p className="text-xs text-primary font-medium">{tokenBalance} tokens</p>
                 </div>
               </div>
               <DropdownMenuSeparator />
@@ -140,7 +170,7 @@ export const DashboardNav = () => {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Log out
               </DropdownMenuItem>
