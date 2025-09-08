@@ -44,10 +44,11 @@ interface MatchedStyle {
 }
 
 interface StyleMatchingSectionProps {
+  hasVideo: boolean;
   onStyleMatch: (matchedStyle: MatchedStyle) => void;
 }
 
-export const StyleMatchingSection = ({ onStyleMatch }: StyleMatchingSectionProps) => {
+export const StyleMatchingSection = ({ hasVideo, onStyleMatch }: StyleMatchingSectionProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
@@ -213,6 +214,24 @@ export const StyleMatchingSection = ({ onStyleMatch }: StyleMatchingSectionProps
     }
   };
 
+  if (!hasVideo) {
+    return (
+      <GlassCard className="p-4 md:p-6">
+        <div className="text-center space-y-4">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto" />
+          <div>
+            <h3 className="font-fredoka text-lg font-semibold text-foreground">
+              Video Required
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Please upload and process a video first before using style matching
+            </p>
+          </div>
+        </div>
+      </GlassCard>
+    );
+  }
+
   return (
     <GlassCard className="p-4 md:p-6">
       <div className="space-y-6">
@@ -223,7 +242,7 @@ export const StyleMatchingSection = ({ onStyleMatch }: StyleMatchingSectionProps
               Match Subtitle Style
             </h3>
             <p className="text-sm text-muted-foreground mt-1">
-              Upload an image to analyze and match subtitle styling
+              Upload an image containing subtitles to analyze and match their styling
             </p>
           </div>
           <Badge variant="secondary" className="hidden sm:flex">

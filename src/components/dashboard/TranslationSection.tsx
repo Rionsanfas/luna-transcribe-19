@@ -15,8 +15,6 @@ interface TranslationSectionProps {
   onSourceLanguageChange: (language: string) => void;
   targetLanguages: string[];
   onTargetLanguagesChange: (languages: string[]) => void;
-  translationPrompt: string;
-  onTranslationPromptChange: (prompt: string) => void;
   preserveFormatting: boolean;
   onPreserveFormattingChange: (preserve: boolean) => void;
   maintainTiming: boolean;
@@ -29,8 +27,6 @@ export const TranslationSection = ({
   onSourceLanguageChange,
   targetLanguages,
   onTargetLanguagesChange,
-  translationPrompt,
-  onTranslationPromptChange,
   preserveFormatting,
   onPreserveFormattingChange,
   maintainTiming,
@@ -210,23 +206,6 @@ export const TranslationSection = ({
               </Label>
             </div>
           </div>
-        </div>
-
-        {/* Custom Translation Prompt */}
-        <div className="space-y-2">
-          <Label htmlFor="translation-prompt" className="text-sm font-medium font-fredoka text-foreground">
-            Custom Translation Instructions
-          </Label>
-          <Textarea
-            id="translation-prompt"
-            value={translationPrompt}
-            onChange={(e) => onTranslationPromptChange(e.target.value)}
-            placeholder="Provide specific instructions for translation (e.g., 'Keep technical terms in English', 'Use formal tone', etc.)"
-            className="min-h-20 text-sm resize-none font-fredoka"
-          />
-          <p className="text-xs text-muted-foreground font-fredoka">
-            Optional: Add context or specific requirements to improve translation quality.
-          </p>
         </div>
 
         {/* Multi-language Output Info */}

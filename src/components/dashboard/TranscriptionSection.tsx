@@ -10,8 +10,6 @@ import { LANGUAGES, POPULAR_LANGUAGES, getLanguageByCode } from "./languages";
 
 interface TranscriptionSectionProps {
   isActive: boolean;
-  customPrompt: string;
-  onCustomPromptChange: (prompt: string) => void;
   primaryLanguage: string;
   onPrimaryLanguageChange: (language: string) => void;
   detectLanguages: string[];
@@ -22,8 +20,6 @@ interface TranscriptionSectionProps {
 
 export const TranscriptionSection = ({
   isActive,
-  customPrompt,
-  onCustomPromptChange,
   primaryLanguage,
   onPrimaryLanguageChange,
   detectLanguages,
@@ -180,27 +176,10 @@ export const TranscriptionSection = ({
             <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
               <p className="text-sm font-fredoka text-foreground">
                 <Sparkles className="h-4 w-4 inline mr-1" />
-                AI will automatically detect the language(s) in your video and transcribe accordingly.
+                AI will automatically detect the language(s) in your video and transcribe accurately using advanced speech recognition models.
               </p>
             </div>
           )}
-        </div>
-
-        {/* Custom AI Prompt */}
-        <div className="space-y-2">
-          <Label htmlFor="transcription-prompt" className="text-sm font-medium font-fredoka text-foreground">
-            Custom AI Prompt for Transcription
-          </Label>
-          <Textarea
-            id="transcription-prompt"
-            value={customPrompt}
-            onChange={(e) => onCustomPromptChange(e.target.value)}
-            placeholder="Describe how you want the AI to transcribe your audio (e.g., 'Focus on technical terms', 'Include speaker emotions', etc.)"
-            className="min-h-20 text-sm resize-none font-fredoka"
-          />
-          <p className="text-xs text-muted-foreground font-fredoka">
-            Optional: Provide specific instructions to improve transcription accuracy for your content type.
-          </p>
         </div>
       </div>
     </GlassCard>
