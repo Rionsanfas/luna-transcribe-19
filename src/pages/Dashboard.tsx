@@ -185,33 +185,33 @@ const Dashboard = () => {
       {/* Top Navigation */}
       <nav className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <GlassCard className="rounded-none border-0">
-          <div className="flex items-center justify-between p-4">
+          <div className="flex items-center justify-between p-3 md:p-4">
             {/* Logo - Clickable to return home */}
             <button 
               onClick={() => navigate('/')}
-              className="font-fredoka text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
+              className="font-fredoka text-xl md:text-2xl font-bold text-primary hover:text-primary/80 transition-colors touch-manipulation min-h-[44px] flex items-center"
             >
               SubAI
             </button>
 
             {/* Right side */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               {/* Theme toggle */}
-              <Button variant="ghost" size="sm" onClick={toggleTheme}>
+              <Button variant="ghost" size="sm" onClick={toggleTheme} className="min-h-[44px] min-w-[44px]">
                 {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
               {/* User menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-3 px-3">
-                    <Avatar className="h-8 w-8">
+                  <Button variant="ghost" className="flex items-center gap-2 md:gap-3 px-2 md:px-3 min-h-[44px]">
+                    <Avatar className="h-6 w-6 md:h-8 md:w-8">
                       <AvatarFallback className="text-xs">
                         {user?.email?.charAt(0).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col items-start text-sm">
-                      <span className="text-foreground">{user?.email}</span>
+                    <div className="hidden sm:flex flex-col items-start text-sm">
+                      <span className="text-foreground text-xs md:text-sm">{user?.email}</span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins className="h-3 w-3" />
                         <span>{tokenBalance} tokens</span>
@@ -220,6 +220,13 @@ const Dashboard = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-2 text-sm sm:hidden">
+                    <p className="font-medium">{user?.email}</p>
+                    <div className="flex items-center gap-1 mt-1 text-xs text-primary">
+                      <Coins className="h-3 w-3" />
+                      <span>{tokenBalance} tokens</span>
+                    </div>
+                  </div>
                   <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     Profile
@@ -241,58 +248,58 @@ const Dashboard = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="font-fredoka text-4xl font-bold">AI Voice Transcription</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <div className="text-center space-y-3 md:space-y-4 pt-4">
+          <h1 className="font-fredoka text-2xl md:text-4xl font-bold">AI Voice Transcription</h1>
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
             Transform your audio and video files into professional subtitles with AI-powered transcription
           </p>
         </div>
 
         {/* Upload Mode Selection */}
-        <GlassCard className="p-6">
-          <h2 className="font-fredoka text-xl font-semibold mb-4">Choose Upload Mode</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <GlassCard className="p-4 md:p-6">
+          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4">Choose Upload Mode</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <Button
               variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
               onClick={() => setUploadMode('transcribe')}
-              className="p-6 h-auto flex-col space-y-2"
+              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
             >
-              <Mic className="h-8 w-8" />
-              <span className="font-medium">Transcribe Audio</span>
-              <span className="text-sm opacity-80">Extract speech from video/audio and generate subtitles</span>
+              <Mic className="h-6 md:h-8 w-6 md:w-8" />
+              <span className="font-medium text-sm md:text-base">Transcribe Audio</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight">Extract speech from video/audio and generate subtitles</span>
             </Button>
             <Button
               variant={uploadMode === 'match' ? 'default' : 'outline'}
               onClick={() => setUploadMode('match')}
-              className="p-6 h-auto flex-col space-y-2"
+              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
             >
-              <Type className="h-8 w-8" />
-              <span className="font-medium">Match Existing Subtitles</span>
-              <span className="text-sm opacity-80">Sync existing text with video timing</span>
+              <Type className="h-6 md:h-8 w-6 md:w-8" />
+              <span className="font-medium text-sm md:text-base">Match Existing Subtitles</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight">Sync existing text with video timing</span>
             </Button>
           </div>
         </GlassCard>
 
         {/* AI Settings */}
-        <GlassCard className="p-6">
-          <h3 className="font-fredoka text-lg font-semibold mb-4">AI Configuration</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <GlassCard className="p-4 md:p-6">
+          <h3 className="font-fredoka text-base md:text-lg font-semibold mb-4">AI Configuration</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
-              <Label htmlFor="custom-prompt">Custom AI Prompt</Label>
+              <Label htmlFor="custom-prompt" className="text-sm font-medium">Custom AI Prompt</Label>
               <Textarea
                 id="custom-prompt"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Describe how you want the AI to process your audio..."
-                className="min-h-20"
+                className="min-h-24 md:min-h-20 text-sm resize-none"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-language">Target Language</Label>
+              <Label htmlFor="target-language" className="text-sm font-medium">Target Language</Label>
               <Select value={targetLanguage} onValueChange={setTargetLanguage}>
-                <SelectTrigger>
+                <SelectTrigger className="min-h-[44px]">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,7 +321,7 @@ const Dashboard = () => {
 
         {/* Upload Area */}
         <GlassCard 
-          className={`p-8 border-2 border-dashed transition-all duration-200 ${
+          className={`p-6 md:p-8 border-2 border-dashed transition-all duration-200 ${
             dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
           }`}
           onDragOver={handleDragOver}
@@ -324,19 +331,19 @@ const Dashboard = () => {
           <div className="text-center space-y-4">
             {!currentVideo ? (
               <>
-                <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center">
                   {uploadMode === 'transcribe' ? (
-                    <FileVideo className="h-8 w-8 text-primary" />
+                    <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-primary" />
                   ) : (
-                    <Languages className="h-8 w-8 text-primary" />
+                    <Languages className="h-6 w-6 md:h-8 md:w-8 text-primary" />
                   )}
                 </div>
                 <div>
-                  <h3 className="font-fredoka text-xl font-semibold">
+                  <h3 className="font-fredoka text-lg md:text-xl font-semibold">
                     {uploadMode === 'transcribe' ? 'Upload Video or Audio' : 'Upload Video for Subtitle Matching'}
                   </h3>
-                  <p className="text-muted-foreground mt-2">
-                    Drag and drop your files here, or click to browse
+                  <p className="text-muted-foreground mt-2 text-sm md:text-base px-4">
+                    Drag and drop your files here, or tap to browse
                   </p>
                 </div>
                 <div>
@@ -347,32 +354,33 @@ const Dashboard = () => {
                     className="hidden"
                     id="file-upload"
                   />
-                  <Button asChild className="font-medium">
+                  <Button asChild className="font-medium min-h-[48px] px-6 md:px-8 touch-manipulation">
                     <label htmlFor="file-upload" className="cursor-pointer">
                       <Upload className="mr-2 h-4 w-4" />
                       Choose File
                     </label>
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Supported: MP4, MOV, AVI, MP3, WAV, M4A • Cost: 1 token per 10MB
+                <p className="text-xs text-muted-foreground px-4 leading-relaxed">
+                  Supported: MP4, MOV, AVI, MP3, WAV, M4A<br className="md:hidden" />
+                  <span className="md:ml-2">Cost: 1 token per 10MB</span>
                 </p>
               </>
             ) : (
               <div className="space-y-4">
-                <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                  <FileVideo className="h-8 w-8 text-green-600" />
+                <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                  <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-fredoka text-xl font-semibold">{currentVideo.name}</h3>
-                  <p className="text-muted-foreground">
+                  <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4">{currentVideo.name}</h3>
+                  <p className="text-muted-foreground text-sm md:text-base">
                     {Math.round(currentVideo.size / (1024 * 1024))}MB • 
                     Cost: {Math.ceil((currentVideo.size / (1024 * 1024)) / 10)} tokens
                   </p>
                 </div>
                 
                 {isProcessing && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 px-4">
                     <Progress value={uploadProgress} className="w-full max-w-md mx-auto" />
                     <p className="text-sm text-muted-foreground">
                       {uploadProgress < 90 ? 'Uploading...' : 'Processing with AI...'}
@@ -388,6 +396,7 @@ const Dashboard = () => {
                     setUploadProgress(0);
                   }}
                   disabled={isProcessing}
+                  className="min-h-[44px] touch-manipulation"
                 >
                   Upload Different File
                 </Button>
@@ -398,30 +407,30 @@ const Dashboard = () => {
 
         {/* Results */}
         {transcriptionResult && (
-          <GlassCard className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-fredoka text-lg font-semibold">Generated Subtitles</h3>
-              <Button onClick={downloadSubtitles} size="sm">
+          <GlassCard className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+              <h3 className="font-fredoka text-base md:text-lg font-semibold">Generated Subtitles</h3>
+              <Button onClick={downloadSubtitles} size="sm" className="min-h-[44px] touch-manipulation">
                 <Download className="mr-2 h-4 w-4" />
                 Download SRT
               </Button>
             </div>
-            <div className="bg-muted/50 rounded-lg p-4 max-h-60 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-sm">{transcriptionResult}</pre>
+            <div className="bg-muted/50 rounded-lg p-3 md:p-4 max-h-60 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-xs md:text-sm">{transcriptionResult}</pre>
             </div>
           </GlassCard>
         )}
 
         {/* Token Status */}
-        <GlassCard className="p-6">
-          <div className="flex items-center justify-between">
+        <GlassCard className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-fredoka text-lg font-semibold">Token Balance</h3>
-              <p className="text-muted-foreground">1 token = 10MB processing</p>
+              <h3 className="font-fredoka text-base md:text-lg font-semibold">Token Balance</h3>
+              <p className="text-muted-foreground text-sm">1 token = 10MB processing</p>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{tokenBalance}</div>
-              <Button variant="outline" size="sm" className="mt-2">
+            <div className="text-center sm:text-right">
+              <div className="text-xl md:text-2xl font-bold text-primary">{tokenBalance}</div>
+              <Button variant="outline" size="sm" className="mt-2 min-h-[44px] touch-manipulation">
                 <Zap className="mr-2 h-4 w-4" />
                 Buy More Tokens
               </Button>

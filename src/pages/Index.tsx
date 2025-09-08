@@ -8,7 +8,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background relative">
       <TopNavigation />
-      <div className="pt-24"> {/* Add padding for fixed nav */}
+      <div className="pt-20 md:pt-24"> {/* Responsive padding for fixed nav */}
         <Hero />
         <section id="features">
           <Features />
