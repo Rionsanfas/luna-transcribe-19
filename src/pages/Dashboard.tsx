@@ -93,74 +93,129 @@ const Dashboard = () => {
   };
 
   const handleVideoUpload = async (file: File) => {
-    if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+    // Validate file type - only videos allowed (except for matching styles feature)
+    if (uploadMode === 'match') {
+      // For matching styles, allow videos and images
+      if (!file.type.startsWith('video/') && !file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a video file or an image for style matching.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // For transcription, only videos allowed
+      if (!file.type.startsWith('video/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload a video file only.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (!user) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload a video or audio file.",
+        title: "Authentication required",
+        description: "Please log in to process videos.",
         variant: "destructive",
       });
       return;
     }
 
-    const fileSizeMB = Math.round(file.size / (1024 * 1024));
-    const tokensRequired = Math.ceil(fileSizeMB / 10);
+    const fileSizeMB = file.size / (1024 * 1024);
+    // Use exact fractional calculation: 1 token = 10MB = $0.20
+    const tokensRequired = fileSizeMB / 10;
 
-    // Check file size limits based on user's plan (default to free plan)
-    const maxFileSizeMB = getFileSizeLimit("free"); // TODO: Get actual user plan from profile
-    if (fileSizeMB > maxFileSizeMB) {
-      toast({
-        title: "File too large",
-        description: `Maximum file size for your plan is ${maxFileSizeMB}MB. Current file is ${fileSizeMB}MB.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (tokenBalance < tokensRequired) {
-      toast({
-        title: "Insufficient tokens",
-        description: `You need ${tokensRequired} tokens but only have ${tokenBalance}.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setCurrentVideo(file);
-    setIsProcessing(true);
-    setUploadProgress(0);
-
+    // Get user's subscription plan and file size limits
     try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_plan, token_balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      const userPlan = profile?.subscription_plan || 'free';
+      const maxFileSizeMB = getFileSizeLimit(userPlan);
+      
+      if (fileSizeMB > maxFileSizeMB) {
+        toast({
+          title: "File too large",
+          description: `Maximum file size for your plan is ${maxFileSizeMB}MB. Current file is ${Math.round(fileSizeMB)}MB.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (tokenBalance < tokensRequired) {
+        toast({
+          title: "Insufficient tokens",
+          description: `You need ${tokensRequired.toFixed(1)} tokens but only have ${tokenBalance}. Please purchase more tokens.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCurrentVideo(file);
+      setIsProcessing(true);
+      setUploadProgress(0);
+
+      // Create video job record
+      const { data: videoJob, error: jobError } = await supabase
+        .from('video_jobs')
+        .insert({
+          user_id: user.id,
+          original_filename: file.name,
+          file_size_mb: Math.round(fileSizeMB),
+          processing_type: uploadMode === 'transcribe' ? 'transcription' : 'style_matching',
+          status: 'pending',
+          target_language: targetLanguage
+        })
+        .select()
+        .single();
+
+      if (jobError) throw jobError;
+
+      setUploadProgress(10);
+
       // Convert file to base64
       const arrayBuffer = await file.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-      // Create progress simulation
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+      setUploadProgress(30);
 
+      // Get authentication token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Authentication failed');
+
+      // Call the backend function
       const { data, error } = await supabase.functions.invoke('generate-subtitles', {
         body: {
-          video_data: base64,
-          video_size_mb: fileSizeMB,
-          custom_prompt: customPrompt,
-          target_language: targetLanguage,
-          upload_mode: uploadMode
-        }
+          videoData: base64,
+          videoSize: file.size,
+          videoJobId: videoJob.id,
+          customPrompt: customPrompt,
+          targetLanguage: targetLanguage,
+          uploadMode: uploadMode
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
-      clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setTranscriptionResult(data.transcription || "Transcription completed successfully!");
+      setTranscriptionResult(data?.transcription || "Processing completed successfully!");
       
       toast({
         title: "Processing complete!",
-        description: `Successfully processed ${file.name}. Used ${tokensRequired} tokens.`,
+        description: `Successfully processed ${file.name}. Used ${tokensRequired.toFixed(1)} tokens.`,
       });
 
     } catch (error: any) {
@@ -246,6 +301,28 @@ const Dashboard = () => {
                   <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session?.access_token) throw new Error('Not authenticated');
+                      
+                      const { data, error } = await supabase.functions.invoke('polar-customer-portal', {
+                        headers: { Authorization: `Bearer ${session.access_token}` }
+                      });
+                      
+                      if (error) throw error;
+                      if (data?.url) window.open(data.url, '_blank');
+                    } catch (error: any) {
+                      toast({
+                        title: "Billing portal error",
+                        description: error.message || "Unable to open billing portal",
+                        variant: "destructive",
+                      });
+                    }
+                  }}>
+                    <Coins className="mr-2 h-4 w-4" />
+                    Billing
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
@@ -361,7 +438,7 @@ const Dashboard = () => {
                 <div>
                   <Input
                     type="file"
-                    accept="video/*,audio/*"
+                    accept={uploadMode === 'match' ? 'video/*,image/*' : 'video/*'}
                     onChange={handleFileSelect}
                     className="hidden"
                     id="file-upload"
@@ -387,15 +464,15 @@ const Dashboard = () => {
                   <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4 text-foreground">{currentVideo.name}</h3>
                   <p className="text-muted-foreground text-sm md:text-base font-fredoka">
                     {Math.round(currentVideo.size / (1024 * 1024))}MB • 
-                    Cost: {Math.ceil((currentVideo.size / (1024 * 1024)) / 10)} tokens
+                    Cost: {((currentVideo.size / (1024 * 1024)) / 10).toFixed(1)} tokens
                   </p>
                 </div>
                 
                 {isProcessing && (
-                  <div className="space-y-2 px-4">
-                    <Progress value={uploadProgress} className="w-full max-w-md mx-auto" />
+                <div className="flex flex-col items-center space-y-3 px-4">
+                    <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                     <p className="text-sm text-muted-foreground font-fredoka">
-                      {uploadProgress < 90 ? 'Uploading...' : 'Processing with AI...'}
+                      Processing video with AI...
                     </p>
                   </div>
                 )}

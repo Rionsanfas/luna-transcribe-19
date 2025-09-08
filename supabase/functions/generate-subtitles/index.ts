@@ -45,7 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const { videoData, videoSize, videoJobId } = await req.json();
+    const { videoData, videoSize, videoJobId, customPrompt, targetLanguage, uploadMode } = await req.json();
 
     if (!videoData || !videoSize || !videoJobId) {
       return new Response(
@@ -57,8 +57,9 @@ serve(async (req) => {
       );
     }
 
-    // Calculate tokens needed (1 token = 10MB)
-    const tokensNeeded = Math.ceil(videoSize / (10 * 1024 * 1024));
+    // Calculate tokens needed using exact fractional calculation (1 token = 10MB = $0.20)
+    const fileSizeMB = videoSize / (1024 * 1024);
+    const tokensNeeded = fileSizeMB / 10;
 
     // Create service client for database operations
     const serviceSupabase = createClient(
@@ -69,7 +70,7 @@ serve(async (req) => {
     // Check user's token balance
     const { data: profile, error: profileError } = await serviceSupabase
       .from('profiles')
-      .select('token_balance')
+      .select('token_balance, subscription_plan')
       .eq('user_id', user.id)
       .single();
 
@@ -87,7 +88,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Insufficient tokens',
-          tokensNeeded,
+          tokensNeeded: tokensNeeded.toFixed(1),
           tokensAvailable: profile?.token_balance || 0
         }),
         { 
@@ -97,7 +98,7 @@ serve(async (req) => {
       );
     }
 
-    // Deduct tokens
+    // Deduct tokens using exact fractional amount
     const { error: updateError } = await serviceSupabase
       .from('profiles')
       .update({ token_balance: (profile?.token_balance || 0) - tokensNeeded })
@@ -144,6 +145,16 @@ serve(async (req) => {
     formData.append('model', 'whisper-1');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'word');
+    
+    // Add custom prompt if provided
+    if (customPrompt && customPrompt.trim()) {
+      formData.append('prompt', customPrompt.trim());
+    }
+    
+    // Add language if specified
+    if (targetLanguage && targetLanguage !== 'en') {
+      formData.append('language', targetLanguage);
+    }
 
     // Call OpenAI Whisper API
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -178,7 +189,7 @@ serve(async (req) => {
     // Process and store subtitles
     const subtitles = [];
     if (transcriptionResult.words) {
-      // Group words into subtitle segments (approximately 3-5 words per subtitle)
+      // Group words into subtitle segments with ratio-aware positioning
       for (let i = 0; i < transcriptionResult.words.length; i += 4) {
         const wordGroup = transcriptionResult.words.slice(i, i + 4);
         const text = wordGroup.map(w => w.word).join(' ');
@@ -192,7 +203,11 @@ serve(async (req) => {
           end_time: endTime,
           duration: endTime - startTime,
           words: wordGroup,
-          confidence: wordGroup.reduce((acc, w) => acc + (w.probability || 1), 0) / wordGroup.length
+          confidence: wordGroup.reduce((acc, w) => acc + (w.probability || 1), 0) / wordGroup.length,
+          // Add ratio-aware positioning (will be applied based on video aspect ratio in frontend)
+          position_x: 50, // Center horizontally (percentage)
+          position_y: 85, // Default bottom position (percentage)
+          ratio_adaptive: true
         });
       }
     }
@@ -222,8 +237,9 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true,
         subtitles: subtitles.length,
-        tokensUsed: tokensNeeded,
-        transcription: transcriptionResult
+        tokensUsed: tokensNeeded.toFixed(1),
+        transcription: transcriptionResult.text,
+        videoJobId: videoJobId
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }

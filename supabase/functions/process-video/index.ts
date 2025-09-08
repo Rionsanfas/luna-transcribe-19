@@ -44,9 +44,9 @@ serve(async (req) => {
       )
     }
 
-    const { video_job_id, processing_type, target_language } = await req.json()
+    const { video_job_id, processing_type, target_language, file_size_mb } = await req.json()
 
-    if (!video_job_id || !processing_type) {
+    if (!video_job_id || !processing_type || !file_size_mb) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { 
@@ -73,13 +73,13 @@ serve(async (req) => {
       )
     }
 
-    const tokensRequired = getTokensRequired(processing_type)
+    const tokensRequired = getTokensRequired(processing_type, file_size_mb)
     
     if ((profile?.token_balance || 0) < tokensRequired) {
       return new Response(
         JSON.stringify({ 
           error: 'Insufficient tokens',
-          tokens_required: tokensRequired,
+          tokens_required: tokensRequired.toFixed(1),
           current_balance: profile?.token_balance || 0
         }),
         { 
@@ -184,7 +184,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        tokens_used: tokensRequired,
+        tokens_used: tokensRequired.toFixed(1),
         new_balance: newBalance,
         job_status: 'processing'
       }),
@@ -205,15 +205,18 @@ serve(async (req) => {
   }
 })
 
-function getTokensRequired(processingType: string): number {
+function getTokensRequired(processingType: string, fileSizeMB: number): number {
+  // Base calculation: 1 token = 10MB = $0.20
+  const baseTokens = fileSizeMB / 10;
+  
   switch (processingType) {
     case 'transcription':
-      return 10
+      return baseTokens;
     case 'translation':
-      return 15
+      return baseTokens * 1.5; // 50% more for translation
     case 'enhancement':
-      return 5
+      return baseTokens * 0.5; // 50% less for enhancement
     default:
-      return 10
+      return baseTokens;
   }
 }
