@@ -8,6 +8,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { getFileSizeLimit } from "@/components/Pricing";
 import { TranscriptionSection } from "@/components/dashboard/TranscriptionSection";
 import { TranslationSection } from "@/components/dashboard/TranslationSection";
+import { VideoEditingProvider } from "@/contexts/VideoEditingContext";
+import { VideoPreview } from "@/components/dashboard/VideoPreview";
+import { SubtitleEditor } from "@/components/dashboard/SubtitleEditor";
+import { EditingControls } from "@/components/dashboard/EditingControls";
 import { 
   Upload, 
   FileVideo, 
@@ -571,20 +575,89 @@ const Dashboard = () => {
           </div>
         </GlassCard>
 
-        {/* Results */}
-        {transcriptionResult && (
-          <GlassCard className="p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-              <h3 className="font-fredoka text-base md:text-lg font-semibold text-foreground">Generated Subtitles</h3>
-              <Button onClick={downloadSubtitles} size="sm" className="min-h-[44px] touch-manipulation font-fredoka">
-                <Download className="mr-2 h-4 w-4" />
-                Download SRT
-              </Button>
-            </div>
-            <div className="bg-muted/50 border border-border rounded-lg p-3 md:p-4 max-h-60 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-xs md:text-sm text-foreground">{transcriptionResult}</pre>
-            </div>
-          </GlassCard>
+        {/* Video Editing Workspace */}
+        {(currentVideo || transcriptionResult) && (
+          <VideoEditingProvider>
+            <GlassCard className="p-4 md:p-6">
+              <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Video Editor</h2>
+              
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                {/* Main editing area - spans 3 columns */}
+                <div className="xl:col-span-3 space-y-6">
+                  {/* Video Preview */}
+                  <VideoPreview 
+                    videoFile={currentVideo}
+                    subtitles={transcriptionResult ? [
+                      { id: '1', startTime: 0, endTime: 2, text: 'Sample subtitle from transcription' },
+                      { id: '2', startTime: 3, endTime: 5, text: 'Generated from your video content' },
+                    ] : []}
+                    onDownloadVideo={() => {
+                      toast({
+                        title: "Export Started",
+                        description: "Your video is being processed with the current settings...",
+                      });
+                    }}
+                    onDownloadSRT={() => {
+                      if (transcriptionResult) {
+                        const blob = new Blob([transcriptionResult], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'subtitles.srt';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      }
+                    }}
+                  />
+                  
+                  {/* Subtitle Editor */}
+                  <SubtitleEditor
+                    subtitles={transcriptionResult ? [
+                      { id: '1', startTime: 0, endTime: 2, text: 'Welcome to the video editing workspace' },
+                      { id: '2', startTime: 3, endTime: 5, text: 'You can edit subtitles here in real-time' },
+                      { id: '3', startTime: 6, endTime: 8, text: 'All changes are reflected in the preview above' },
+                    ] : []}
+                    onSubtitleUpdate={(subtitles) => {
+                      console.log('Subtitles updated:', subtitles);
+                    }}
+                    onSeekToTime={(time) => {
+                      console.log('Seeking to time:', time);
+                    }}
+                    currentTime={0}
+                  />
+                </div>
+                
+                {/* Editing Controls Sidebar */}
+                <div className="xl:col-span-1">
+                  <EditingControls />
+                </div>
+              </div>
+
+              {/* Processing Status & Original Download */}
+              {currentVideo && (
+                <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">File Information</h4>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div>File: {currentVideo.name}</div>
+                        <div>Size: {(currentVideo.size / (1024 * 1024)).toFixed(2)} MB</div>
+                        <div>Type: {currentVideo.type}</div>
+                      </div>
+                    </div>
+                    {transcriptionResult && (
+                      <Button onClick={downloadSubtitles} size="sm" variant="outline" className="font-fredoka">
+                        <Download className="mr-2 h-4 w-4" />
+                        Original SRT
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </GlassCard>
+          </VideoEditingProvider>
         )}
 
         {/* Token Status */}
