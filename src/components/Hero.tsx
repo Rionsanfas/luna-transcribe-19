@@ -40,10 +40,7 @@ export const Hero = () => {
 
         {/* CTA buttons */}
         <div className="animate-slide-up flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <Button size="lg" className="font-fredoka font-medium text-lg px-8 py-4 rounded-2xl" onClick={() => window.location.href = '/dashboard'}>
-              Start Transcribing
-              <Zap className="ml-2 h-5 w-5" />
-            </Button>
+            
           <Button variant="outline" size="lg" className="group font-fredoka font-medium text-lg px-8 py-4 rounded-2xl border-2 hover:bg-accent/50 transition-all duration-300" onClick={() => window.location.href = '/dashboard'}>
             <Upload className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
             Try Dashboard
