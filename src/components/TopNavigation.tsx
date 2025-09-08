@@ -37,8 +37,8 @@ export const TopNavigation = () => {
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled 
-        ? 'bg-primary/95 backdrop-blur-md border-b border-border/50 py-2 shadow-lg' 
-        : 'bg-background/60 backdrop-blur-sm py-4 md:py-6'
+        ? 'bg-card/95 backdrop-blur-md border-b border-border/50 py-2 shadow-lg' 
+        : 'bg-card/60 backdrop-blur-sm py-4 md:py-6'
     }`}>
       <div className="container mx-auto">
         <nav className="flex items-center justify-between px-4 md:px-6">
@@ -49,7 +49,7 @@ export const TopNavigation = () => {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className={`${isScrolled ? 'text-white/90 hover:text-white' : 'text-foreground'}`}
+                  className={`${isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-foreground'}`}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
@@ -100,18 +100,18 @@ export const TopNavigation = () => {
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
             <a href="#features" className={`text-sm transition-colors hover:scale-105 ${
-              isScrolled ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+              isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}>
               Features
             </a>
             <a href="#pricing" className={`text-sm transition-colors hover:scale-105 ${
-              isScrolled ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+              isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
             }`}>
               Pricing
             </a>
             {user && (
               <Link to="/dashboard" className={`text-sm transition-colors hover:scale-105 ${
-                isScrolled ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground'
+                isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}>
                 Dashboard
               </Link>
@@ -121,7 +121,7 @@ export const TopNavigation = () => {
           {/* Center - Logo */}
           <div className="flex items-center absolute left-1/2 transform -translate-x-1/2 md:static md:transform-none">
             <Link to="/" className={`font-fredoka text-lg md:text-xl font-semibold transition-all duration-300 ${
-              isScrolled ? 'text-white scale-90' : 'text-foreground scale-100'
+              isScrolled ? 'text-card-foreground scale-90' : 'text-foreground scale-100'
             }`}>
               SubAI
             </Link>
@@ -133,7 +133,7 @@ export const TopNavigation = () => {
               <div className="flex items-center space-x-2 md:space-x-3">
                 {/* Token Balance - Hidden on very small screens */}
                 <div className={`hidden sm:flex items-center space-x-1 text-sm ${
-                  isScrolled ? 'text-white/90' : 'text-muted-foreground'
+                  isScrolled ? 'text-card-foreground/90' : 'text-muted-foreground'
                 }`}>
                   <Coins className="h-4 w-4" />
                   <span>{tokenBalance}</span>
@@ -143,7 +143,7 @@ export const TopNavigation = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className={`flex items-center space-x-2 min-h-[44px] ${
-                      isScrolled ? 'text-white/90 hover:text-white hover:bg-white/20' : ''
+                      isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : ''
                     }`}>
                       <User className="h-4 w-4" />
                       <span className="hidden md:block">{user.email?.split('@')[0]}</span>
@@ -172,12 +172,12 @@ export const TopNavigation = () => {
             ) : (
               <div className="flex items-center space-x-2">
                 <Button variant="ghost" size="sm" className={`min-h-[44px] ${
-                  isScrolled ? 'text-white/90 hover:text-white hover:bg-white/20' : 'text-muted-foreground'
+                  isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : 'text-muted-foreground'
                 }`} asChild>
                   <Link to="/auth">Sign In</Link>
                 </Button>
                 <Button size="sm" className={`min-h-[44px] ${
-                  isScrolled ? 'bg-white text-primary hover:bg-white/90' : 'bg-primary hover:bg-primary/90'
+                  isScrolled ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-primary hover:bg-primary/90'
                 }`} asChild>
                   <Link to="/auth">Get Started</Link>
                 </Button>

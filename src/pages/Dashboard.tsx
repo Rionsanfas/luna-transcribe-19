@@ -183,7 +183,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
-      <nav className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
+      <nav className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50">
         <GlassCard className="rounded-none border-0">
           <div className="flex items-center justify-between p-3 md:p-4">
             {/* Logo - Clickable to return home */}
@@ -211,7 +211,7 @@ const Dashboard = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden sm:flex flex-col items-start text-sm">
-                      <span className="text-foreground text-xs md:text-sm">{user?.email}</span>
+                     <span className="text-card-foreground text-xs md:text-sm">{user?.email}</span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins className="h-3 w-3" />
                         <span>{tokenBalance} tokens</span>
@@ -415,8 +415,8 @@ const Dashboard = () => {
                 Download SRT
               </Button>
             </div>
-            <div className="bg-muted/50 rounded-lg p-3 md:p-4 max-h-60 overflow-y-auto">
-              <pre className="whitespace-pre-wrap text-xs md:text-sm">{transcriptionResult}</pre>
+            <div className="bg-muted/50 border border-border rounded-lg p-3 md:p-4 max-h-60 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-xs md:text-sm text-foreground">{transcriptionResult}</pre>
             </div>
           </GlassCard>
         )}
