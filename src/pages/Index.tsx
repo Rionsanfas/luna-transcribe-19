@@ -9,20 +9,13 @@ const Index = () => {
     <div className="min-h-screen bg-background relative">
       <TopNavigation />
       <div className="pt-20 md:pt-24"> {/* Responsive padding for fixed nav */}
-        {/* Hero Section */}
         <Hero />
-        
-        {/* Features Section */}
         <section id="features">
           <Features />
         </section>
-        
-        {/* Pricing Section */}
         <section id="pricing">
           <Pricing />
         </section>
-        
-        {/* Footer */}
         <Footer />
       </div>
     </div>

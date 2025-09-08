@@ -41,36 +41,17 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // First, try to find existing Polar customer by email
-    const customersResponse = await fetch(`https://api.polar.sh/v1/customers?email=${encodeURIComponent(user.email)}&limit=1`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${polarAccessToken}`,
-        "Content-Type": "application/json",
-      },
-    });
+    // Get user's Polar customer ID from database or create one
+    const { data: subscriberData } = await supabaseClient
+      .from("subscribers")
+      .select("polar_customer_id")
+      .eq("user_id", user.id)
+      .single();
 
-    let polarCustomerId;
+    let polarCustomerId = subscriberData?.polar_customer_id;
     
-    if (customersResponse.ok) {
-      const customersData = await customersResponse.json();
-      if (customersData.items && customersData.items.length > 0) {
-        polarCustomerId = customersData.items[0].id;
-        logStep("Found existing Polar customer", { polarCustomerId });
-        
-        // Update subscriber record with Polar customer ID
-        await supabaseClient
-          .from("subscribers")
-          .upsert({
-            user_id: user.id,
-            email: user.email,
-            polar_customer_id: polarCustomerId,
-          }, { onConflict: 'user_id' });
-      }
-    }
-    
-    // If no existing customer found, create a new one
     if (!polarCustomerId) {
+      // Create a Polar customer if one doesn't exist
       const createCustomerResponse = await fetch("https://api.polar.sh/v1/customers", {
         method: "POST",
         headers: {
@@ -83,44 +64,22 @@ serve(async (req) => {
         }),
       });
 
-      if (createCustomerResponse.ok) {
-        const customerData = await createCustomerResponse.json();
-        polarCustomerId = customerData.id;
-        logStep("Created new Polar customer", { polarCustomerId });
-
-        // Update subscriber record with Polar customer ID
-        await supabaseClient
-          .from("subscribers")
-          .upsert({
-            user_id: user.id,
-            email: user.email,
-            polar_customer_id: polarCustomerId,
-          }, { onConflict: 'user_id' });
-      } else {
-        // If creation fails, try to get the existing customer again (race condition)
-        const errorText = await createCustomerResponse.text();
-        if (errorText.includes("already exists")) {
-          const retryResponse = await fetch(`https://api.polar.sh/v1/customers?email=${encodeURIComponent(user.email)}&limit=1`, {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${polarAccessToken}`,
-              "Content-Type": "application/json",
-            },
-          });
-          
-          if (retryResponse.ok) {
-            const retryData = await retryResponse.json();
-            if (retryData.items && retryData.items.length > 0) {
-              polarCustomerId = retryData.items[0].id;
-              logStep("Found existing customer after creation conflict", { polarCustomerId });
-            }
-          }
-        }
-        
-        if (!polarCustomerId) {
-          throw new Error(`Failed to create or find Polar customer: ${errorText}`);
-        }
+      if (!createCustomerResponse.ok) {
+        throw new Error(`Failed to create Polar customer: ${await createCustomerResponse.text()}`);
       }
+
+      const customerData = await createCustomerResponse.json();
+      polarCustomerId = customerData.id;
+      logStep("Created new Polar customer", { polarCustomerId });
+
+      // Update subscriber record with Polar customer ID
+      await supabaseClient
+        .from("subscribers")
+        .upsert({
+          user_id: user.id,
+          email: user.email,
+          polar_customer_id: polarCustomerId,
+        }, { onConflict: 'user_id' });
     }
 
     // Create customer portal session

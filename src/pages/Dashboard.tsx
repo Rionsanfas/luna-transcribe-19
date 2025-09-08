@@ -5,7 +5,6 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { 
   Upload, 
   FileVideo, 
@@ -14,6 +13,8 @@ import {
   Settings, 
   User,
   LogOut,
+  Moon,
+  Sun,
   Coins,
   Play,
   Pause,
@@ -33,6 +34,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, tokenBalance, signOut } = useAuth();
   const { toast } = useToast();
+  const [isDark, setIsDark] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -42,38 +44,9 @@ const Dashboard = () => {
   const [targetLanguage, setTargetLanguage] = useState("en");
   const [uploadMode, setUploadMode] = useState<'transcribe' | 'match'>('transcribe');
 
-  const handleBillingClick = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to access billing.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('polar-customer-portal', {
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        window.open(data.url, '_blank');
-      } else {
-        throw new Error('No portal URL received');
-      }
-    } catch (error) {
-      console.error('Error opening billing portal:', error);
-      toast({
-        title: "Error",
-        description: "Failed to open billing portal. Please try again.",
-        variant: "destructive",
-      });
-    }
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
   };
 
   const handleSignOut = async () => {
@@ -130,18 +103,6 @@ const Dashboard = () => {
 
     const fileSizeMB = Math.round(file.size / (1024 * 1024));
     const tokensRequired = Math.ceil(fileSizeMB / 10);
-
-    // Check file size limits based on subscription plan
-    // For now, using basic limits - this will be enhanced with actual subscription checking
-    const maxSizeMB = 250; // Free plan limit
-    if (fileSizeMB > maxSizeMB) {
-      toast({
-        title: "File too large",
-        description: `File size (${fileSizeMB}MB) exceeds the ${maxSizeMB}MB limit for your plan. Upgrade for larger files.`,
-        variant: "destructive",
-      });
-      return;
-    }
 
     if (tokenBalance < tokensRequired) {
       toast({
@@ -236,7 +197,9 @@ const Dashboard = () => {
             {/* Right side */}
             <div className="flex items-center gap-2 md:gap-4">
               {/* Theme toggle */}
-              <ThemeToggle />
+              <Button variant="ghost" size="sm" onClick={toggleTheme} className="min-h-[44px] min-w-[44px]">
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
 
               {/* User menu */}
               <DropdownMenu>
@@ -256,24 +219,24 @@ const Dashboard = () => {
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground">
+                <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-2 text-sm sm:hidden">
-                    <p className="font-medium text-foreground">{user?.email}</p>
+                    <p className="font-medium">{user?.email}</p>
                     <div className="flex items-center gap-1 mt-1 text-xs text-primary">
                       <Coins className="h-3 w-3" />
                       <span>{tokenBalance} tokens</span>
                     </div>
                   </div>
-                  <DropdownMenuItem onClick={() => navigate('/settings')} className="text-foreground">
+                  <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleBillingClick} className="text-foreground">
-                    <Settings className="mr-2 h-4 w-4" />
-                    Customer Portal
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-foreground">
+                  <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out
                   </DropdownMenuItem>
