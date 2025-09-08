@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Star, Zap } from "lucide-react";
-import Spline from '@splinetool/react-spline';
+
 const monthlyPlans = [{
   name: "Basic",
   price: "$19.99",
@@ -45,6 +45,7 @@ const monthlyPlans = [{
   productId: "dbf10011-1973-4639-9723-81fd8d4f96c1",
   checkoutUrl: "https://buy.polar.sh/polar_cl_6vL2qZ4pIDPkzWZsXAeHcIFYlojx5TJKvklIW1UMhPO"
 }];
+
 const yearlyPlans = [{
   name: "Basic",
   price: "$238.99",
@@ -86,27 +87,32 @@ const yearlyPlans = [{
   productId: "91e74ded-3e16-4511-b299-f10b35778870",
   checkoutUrl: "https://buy.polar.sh/polar_cl_feKNJww7PMRcA7VKxkoBDjRNfkFML4GTihGaE1riZkm"
 }];
+
 export const Pricing = () => {
   const [isYearly, setIsYearly] = useState(false);
   const currentPlans = isYearly ? yearlyPlans : monthlyPlans;
+  
   const handleGetStarted = (checkoutUrl: string) => {
     window.open(checkoutUrl, '_blank');
   };
-  return <section className="py-20 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Spline
-            scene="https://prod.spline.design/6Ik3ijGEYEUWVNok/scene.splinecode"
-            className="w-full h-full opacity-30 scale-75"
-          />
-        </div>
+
+  return (
+    <section className="py-20 px-4 relative overflow-hidden" id="pricing">
+      {/* Animated Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 animate-pulse"></div>
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/3 to-transparent animate-pulse" style={{animationDelay: '2s'}}></div>
       
-      <div className="relative z-20 max-w-5xl mx-auto">
+      {/* Floating Elements */}
+      <div className="absolute top-20 left-10 w-20 h-20 bg-primary/10 rounded-full blur-xl animate-bounce" style={{animationDuration: '3s'}}></div>
+      <div className="absolute bottom-20 right-10 w-32 h-32 bg-secondary/10 rounded-full blur-xl animate-bounce" style={{animationDuration: '4s', animationDelay: '1s'}}></div>
+      
+      <div className="relative z-20 max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-fredoka font-bold mb-6">
+          <h2 className="text-4xl md:text-5xl font-fredoka font-bold mb-6">
             Choose Your <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Plan</span>
           </h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Get started with our flexible pricing options designed for every need
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Get started with our flexible pricing options designed for every creator's needs
           </p>
           
           {/* Billing Toggle */}
@@ -114,8 +120,15 @@ export const Pricing = () => {
             <span className={`text-sm font-medium ${!isYearly ? 'text-primary' : 'text-muted-foreground'}`}>
               Monthly
             </span>
-            <button onClick={() => setIsYearly(!isYearly)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isYearly ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'}`}>
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isYearly ? 'translate-x-6' : 'translate-x-1'}`} />
+            <button 
+              onClick={() => setIsYearly(!isYearly)} 
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isYearly ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                isYearly ? 'translate-x-6' : 'translate-x-1'
+              }`} />
             </button>
             <span className={`text-sm font-medium ${isYearly ? 'text-primary' : 'text-muted-foreground'}`}>
               Yearly
@@ -126,45 +139,72 @@ export const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 relative z-10 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
           {currentPlans.map((plan, index) => (
-            <GlassCard key={index} className="p-8 hover:scale-105 transition-transform duration-300 relative">
+            <GlassCard 
+              key={index} 
+              className={`relative transition-all duration-500 hover:scale-105 ${
+                plan.popular ? 'scale-105 shadow-glow-strong border-primary/20' : 'hover:shadow-glow-soft'
+              } rounded-3xl p-8`}
+              style={{
+                animationDelay: `${index * 150}ms`,
+                animation: 'fade-in 0.8s ease-out forwards'
+              }}
+            >
               {plan.popular && (
-                <div className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium absolute -top-4 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                  Most Popular
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <Badge className="bg-primary text-primary-foreground px-4 py-1 rounded-full font-fredoka">
+                    <Star className="h-3 w-3 mr-1" />
+                    Most Popular
+                  </Badge>
                 </div>
               )}
-              <div className="text-center mb-8">
-                <h3 className="text-3xl font-bold mb-4">{plan.name}</h3>
-                <div className="text-4xl font-bold text-primary mb-6">
-                  {plan.price}
-                  <span className="text-lg text-muted-foreground">
-                    {isYearly ? "/year" : "/month"}
-                  </span>
+              
+              <div className="text-center mb-6">
+                <h3 className="font-fredoka text-2xl font-bold mb-2">{plan.name}</h3>
+                <div className="flex items-baseline justify-center gap-1 mb-1">
+                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-lg text-muted-foreground">{plan.period}</span>
                 </div>
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <span className="font-fredoka font-medium text-primary">{plan.tokens}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
               </div>
-              <ul className="space-y-4 mb-8">
-                {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-center text-base">
-                    <span className="text-primary mr-3 text-lg">✓</span>
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+
               <Button 
-                className="w-full bg-primary hover:bg-primary/90 py-3 text-lg"
+                size="lg" 
+                variant={plan.popular ? "default" : "outline"} 
+                className="w-full mb-6 font-fredoka font-medium rounded-xl" 
                 onClick={() => handleGetStarted(plan.checkoutUrl)}
               >
                 Get Started
               </Button>
+
+              <ul className="space-y-3">
+                {plan.features.map((feature, featureIndex) => (
+                  <li key={featureIndex} className="flex items-start gap-3">
+                    <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-sm">{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </GlassCard>
           ))}
         </div>
 
         {/* Token explanation */}
         <div className="mt-16 text-center">
-          
+          <GlassCard className="p-6 max-w-2xl mx-auto">
+            <h3 className="font-fredoka text-xl font-bold mb-3">How Tokens Work</h3>
+            <p className="text-muted-foreground">
+              1 token = 10MB of video processing. Tokens are used for AI subtitle generation and video export. 
+              Unused tokens never expire, giving you complete flexibility.
+            </p>
+          </GlassCard>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };
