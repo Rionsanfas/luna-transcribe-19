@@ -19,16 +19,6 @@ export const getFileSizeLimit = (planType: string) => {
 };
 
 const monthlyPlans = [{
-  name: "Free",
-  price: "Free",
-  period: "",
-  tokens: "10 tokens",
-  description: "Perfect for trying out our AI transcription",
-  features: ["10 tokens to start", "Basic transcription", "250MB max file size", "Standard processing", "Community support", "Basic export formats"],
-  popular: false,
-  productId: "free",
-  checkoutUrl: "/dashboard"
-}, {
   name: "Basic",
   price: "$19.99",
   period: "/month",
@@ -71,16 +61,6 @@ const monthlyPlans = [{
 }];
 
 const yearlyPlans = [{
-  name: "Free",
-  price: "Free",
-  period: "",
-  tokens: "10 tokens",
-  description: "Perfect for trying out our AI transcription",
-  features: ["10 tokens to start", "Basic transcription", "250MB max file size", "Standard processing", "Community support", "Basic export formats"],
-  popular: false,
-  productId: "free",
-  checkoutUrl: "/dashboard"
-}, {
   name: "Basic",
   price: "$238.99",
   period: "/year",
@@ -173,7 +153,7 @@ export const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {currentPlans.map((plan, index) => (
             <GlassCard 
               key={index} 

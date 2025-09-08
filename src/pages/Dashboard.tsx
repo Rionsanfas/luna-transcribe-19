@@ -262,16 +262,16 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="text-center space-y-3 md:space-y-4 pt-4">
-          <h1 className="font-fredoka text-2xl md:text-4xl font-bold">AI Voice Transcription</h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
+              <div className="text-center space-y-3 md:space-y-4 pt-4">
+          <h1 className="font-fredoka text-2xl md:text-4xl font-bold text-foreground">AI Voice Transcription</h1>
+          <p className="text-lg md:text-xl text-foreground max-w-2xl mx-auto px-4">
             Transform your audio and video files into professional subtitles with AI-powered transcription
           </p>
         </div>
 
         {/* Upload Mode Selection */}
         <GlassCard className="p-4 md:p-6">
-          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4">Choose Upload Mode</h2>
+          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Choose Upload Mode</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <Button
               variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
@@ -296,7 +296,7 @@ const Dashboard = () => {
 
         {/* AI Settings */}
         <GlassCard className="p-4 md:p-6">
-          <h3 className="font-fredoka text-base md:text-lg font-semibold mb-4">AI Configuration</h3>
+          <h3 className="font-fredoka text-base md:text-lg font-semibold mb-4 text-foreground">AI Configuration</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
               <Label htmlFor="custom-prompt" className="text-sm font-medium">Custom AI Prompt</Label>
