@@ -1,16 +1,19 @@
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Play, Upload, Zap } from "lucide-react";
-import Spline from '@splinetool/react-spline';
 
 export const Hero = () => {
   return (
     <section className="min-h-screen flex items-center justify-center px-4 py-20 relative overflow-hidden">
-      {/* 3D Spline Background Animation - Interactive */}
-      <div className="absolute inset-0 z-10 pointer-events-auto opacity-40">
-        <Spline
-          scene="https://prod.spline.design/Z8nNT2-vDbtY8ZP7/scene.splinecode" 
-        />
+      {/* Animated Background */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 animate-pulse"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent animate-pulse" style={{animationDelay: '3s'}}></div>
+        
+        {/* Floating Elements */}
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-primary/20 rounded-full blur-2xl animate-bounce" style={{animationDuration: '4s'}}></div>
+        <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-secondary/20 rounded-full blur-xl animate-bounce" style={{animationDuration: '5s', animationDelay: '1s'}}></div>
+        <div className="absolute top-1/2 right-1/3 w-16 h-16 bg-accent/30 rounded-full blur-lg animate-bounce" style={{animationDuration: '3s', animationDelay: '2s'}}></div>
       </div>
       
       {/* Hero content */}
