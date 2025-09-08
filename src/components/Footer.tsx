@@ -1,10 +1,8 @@
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Github, Twitter, Mail, Heart } from "lucide-react";
-
 export const Footer = () => {
-  return (
-    <footer className="py-16 px-4 relative">
+  return <footer className="py-16 px-4 relative">
       <div className="max-w-7xl mx-auto">
         <div className="bg-card border border-border rounded-2xl p-8 shadow-lg">
           <div className="text-center mb-8">
@@ -63,18 +61,8 @@ export const Footer = () => {
             </div>
           </div>
 
-          <div className="border-t border-border pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-foreground">
-            <div className="flex items-center gap-2">
-              <span>© 2024 SubAI. Made with</span>
-              <Heart className="h-3 w-3 text-red-500" />
-              <span>using AI technology</span>
-            </div>
-            <div>
-              <span>Powered by OpenAI & Polar.sh</span>
-            </div>
-          </div>
+          
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
