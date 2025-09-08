@@ -177,7 +177,7 @@ export const Pricing = () => {
                 size="lg" 
                 variant={plan.popular ? "default" : "outline"} 
                 className="w-full mb-6 font-fredoka font-medium rounded-xl" 
-                onClick={() => handleGetStarted(plan.checkoutUrl)}
+                onClick={() => window.location.href = '/dashboard'}
               >
                 Get Started
               </Button>

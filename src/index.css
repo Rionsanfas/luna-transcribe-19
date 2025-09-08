@@ -127,15 +127,12 @@
 
 body {
   background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  line-height: 1.6;
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: 100vh;
+  font-family: 'Fredoka', system-ui, -apple-system, sans-serif;
   position: relative;
 }
 
-/* Global noise texture */
+/* Enhanced flowing noise texture with subtle colors */
 body::before {
   content: '';
   position: fixed;
@@ -143,20 +140,58 @@ body::before {
   left: 0;
   width: 100%;
   height: 100%;
+  background: 
+    /* Flowing color gradients */
+    radial-gradient(circle at 20% 20%, rgba(239, 68, 68, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 40% 80%, rgba(34, 197, 94, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.04) 0%, transparent 40%),
+    /* Moving light spots */
+    radial-gradient(circle at 60% 40%, rgba(255, 255, 255, 0.08) 0%, transparent 30%),
+    radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.06) 0%, transparent 25%),
+    /* Noise texture */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
   pointer-events: none;
-  background-image: 
-    radial-gradient(circle at 20% 50%, transparent 20%, rgba(120, 119, 198, 0.1) 21%, rgba(120, 119, 198, 0.1) 34%, transparent 35%, transparent),
-    linear-gradient(0deg, transparent 24%, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.05) 75%, rgba(255, 255, 255, 0.05) 76%, transparent 77%, transparent),
-    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
-  background-size: 4px 4px, 2px 2px, 8px 8px;
-  opacity: 0.6;
-  z-index: -1;
+  z-index: 1;
+  animation: noiseFlow 20s ease-in-out infinite alternate;
 }
 
+/* Flowing animation */
+@keyframes noiseFlow {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0.8;
+  }
+  25% {
+    transform: translate(-2px, -3px) rotate(0.5deg);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(1px, -2px) rotate(-0.3deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-1px, 2px) rotate(0.2deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(2px, 1px) rotate(-0.1deg);
+    opacity: 0.8;
+  }
+}
+
+/* Dark mode noise texture */
 .dark body::before {
-  background-image: 
-    radial-gradient(circle at 20% 50%, transparent 20%, rgba(100, 100, 100, 0.15) 21%, rgba(100, 100, 100, 0.15) 34%, transparent 35%, transparent),
-    linear-gradient(0deg, transparent 24%, rgba(255, 255, 255, 0.02) 25%, rgba(255, 255, 255, 0.02) 26%, transparent 27%, transparent 74%, rgba(255, 255, 255, 0.02) 75%, rgba(255, 255, 255, 0.02) 76%, transparent 77%, transparent),
-    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.01) 0%, transparent 50%);
+  background: 
+    /* Flowing color gradients */
+    radial-gradient(circle at 20% 20%, rgba(239, 68, 68, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.02) 0%, transparent 40%),
+    radial-gradient(circle at 40% 80%, rgba(34, 197, 94, 0.02) 0%, transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(168, 85, 247, 0.03) 0%, transparent 40%),
+    /* Moving light spots */
+    radial-gradient(circle at 60% 40%, rgba(255, 255, 255, 0.04) 0%, transparent 30%),
+    radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.02) 0%, transparent 25%),
+    /* Noise texture */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
 }
 }

@@ -1,47 +1,434 @@
 import { useState } from "react";
-import { DashboardNav } from "@/components/dashboard/DashboardNav";
-import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
-import { UploadSection } from "@/components/dashboard/UploadSection";
-import { VideoWorkspace } from "@/components/dashboard/VideoWorkspace";
-import { EditingPanels } from "@/components/dashboard/EditingPanels";
-import { StatusBar } from "@/components/dashboard/StatusBar";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
+import { 
+  Upload, 
+  FileVideo, 
+  Languages, 
+  Zap, 
+  Settings, 
+  User,
+  LogOut,
+  Moon,
+  Sun,
+  Coins,
+  Play,
+  Pause,
+  Download,
+  Type,
+  Mic
+} from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 
 const Dashboard = () => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [editingPanelsCollapsed, setEditingPanelsCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { user, tokenBalance, signOut } = useAuth();
+  const { toast } = useToast();
+  const [isDark, setIsDark] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentVideo, setCurrentVideo] = useState<File | null>(null);
+  const [transcriptionResult, setTranscriptionResult] = useState<string>("");
+  const [customPrompt, setCustomPrompt] = useState("Transcribe this audio accurately and create properly timed subtitles.");
+  const [targetLanguage, setTargetLanguage] = useState("en");
+  const [uploadMode, setUploadMode] = useState<'transcribe' | 'match'>('transcribe');
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "There was a problem signing you out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleVideoUpload(files[0]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleVideoUpload(file);
+    }
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!file.type.startsWith('video/') && !file.type.startsWith('audio/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a video or audio file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fileSizeMB = Math.round(file.size / (1024 * 1024));
+    const tokensRequired = Math.ceil(fileSizeMB / 10);
+
+    if (tokenBalance < tokensRequired) {
+      toast({
+        title: "Insufficient tokens",
+        description: `You need ${tokensRequired} tokens but only have ${tokenBalance}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCurrentVideo(file);
+    setIsProcessing(true);
+    setUploadProgress(0);
+
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+      // Create progress simulation
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 500);
+
+      const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+        body: {
+          video_data: base64,
+          video_size_mb: fileSizeMB,
+          custom_prompt: customPrompt,
+          target_language: targetLanguage,
+          upload_mode: uploadMode
+        }
+      });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (error) {
+        throw error;
+      }
+
+      setTranscriptionResult(data.transcription || "Transcription completed successfully!");
+      
+      toast({
+        title: "Processing complete!",
+        description: `Successfully processed ${file.name}. Used ${tokensRequired} tokens.`,
+      });
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to process the file. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        setUploadProgress(0);
+      }, 2000);
+    }
+  };
+
+  const downloadSubtitles = () => {
+    if (!transcriptionResult) return;
+    
+    const blob = new Blob([transcriptionResult], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'subtitles.srt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background">
       {/* Top Navigation */}
-      <DashboardNav />
-      
-      <div className="flex flex-1">
-        {/* Left Sidebar */}
-        <DashboardSidebar 
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
-        
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col p-4 space-y-4">
-          {/* Upload & Start Section */}
-          <UploadSection />
-          
-          {/* Video Workspace */}
-          <div className="flex-1 flex gap-4">
-            <VideoWorkspace />
-            
-            {/* Right Editing Panels */}
-            <EditingPanels 
-              collapsed={editingPanelsCollapsed}
-              onToggleCollapse={() => setEditingPanelsCollapsed(!editingPanelsCollapsed)}
-            />
+      <nav className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
+        <GlassCard className="rounded-none border-0">
+          <div className="flex items-center justify-between p-4">
+            {/* Logo - Clickable to return home */}
+            <button 
+              onClick={() => navigate('/')}
+              className="font-fredoka text-2xl font-bold text-primary hover:text-primary/80 transition-colors"
+            >
+              SubAI
+            </button>
+
+            {/* Right side */}
+            <div className="flex items-center gap-4">
+              {/* Theme toggle */}
+              <Button variant="ghost" size="sm" onClick={toggleTheme}>
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+
+              {/* User menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center gap-3 px-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {user?.email?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col items-start text-sm">
+                      <span className="text-foreground">{user?.email}</span>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Coins className="h-3 w-3" />
+                        <span>{tokenBalance} tokens</span>
+                      </div>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
+        </GlassCard>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <h1 className="font-fredoka text-4xl font-bold">AI Voice Transcription</h1>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Transform your audio and video files into professional subtitles with AI-powered transcription
+          </p>
         </div>
+
+        {/* Upload Mode Selection */}
+        <GlassCard className="p-6">
+          <h2 className="font-fredoka text-xl font-semibold mb-4">Choose Upload Mode</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
+              onClick={() => setUploadMode('transcribe')}
+              className="p-6 h-auto flex-col space-y-2"
+            >
+              <Mic className="h-8 w-8" />
+              <span className="font-medium">Transcribe Audio</span>
+              <span className="text-sm opacity-80">Extract speech from video/audio and generate subtitles</span>
+            </Button>
+            <Button
+              variant={uploadMode === 'match' ? 'default' : 'outline'}
+              onClick={() => setUploadMode('match')}
+              className="p-6 h-auto flex-col space-y-2"
+            >
+              <Type className="h-8 w-8" />
+              <span className="font-medium">Match Existing Subtitles</span>
+              <span className="text-sm opacity-80">Sync existing text with video timing</span>
+            </Button>
+          </div>
+        </GlassCard>
+
+        {/* AI Settings */}
+        <GlassCard className="p-6">
+          <h3 className="font-fredoka text-lg font-semibold mb-4">AI Configuration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-prompt">Custom AI Prompt</Label>
+              <Textarea
+                id="custom-prompt"
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="Describe how you want the AI to process your audio..."
+                className="min-h-20"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="target-language">Target Language</Label>
+              <Select value={targetLanguage} onValueChange={setTargetLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Spanish</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="de">German</SelectItem>
+                  <SelectItem value="it">Italian</SelectItem>
+                  <SelectItem value="pt">Portuguese</SelectItem>
+                  <SelectItem value="ru">Russian</SelectItem>
+                  <SelectItem value="ja">Japanese</SelectItem>
+                  <SelectItem value="ko">Korean</SelectItem>
+                  <SelectItem value="zh">Chinese</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </GlassCard>
+
+        {/* Upload Area */}
+        <GlassCard 
+          className={`p-8 border-2 border-dashed transition-all duration-200 ${
+            dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <div className="text-center space-y-4">
+            {!currentVideo ? (
+              <>
+                <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  {uploadMode === 'transcribe' ? (
+                    <FileVideo className="h-8 w-8 text-primary" />
+                  ) : (
+                    <Languages className="h-8 w-8 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-fredoka text-xl font-semibold">
+                    {uploadMode === 'transcribe' ? 'Upload Video or Audio' : 'Upload Video for Subtitle Matching'}
+                  </h3>
+                  <p className="text-muted-foreground mt-2">
+                    Drag and drop your files here, or click to browse
+                  </p>
+                </div>
+                <div>
+                  <Input
+                    type="file"
+                    accept="video/*,audio/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <Button asChild className="font-medium">
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Choose File
+                    </label>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Supported: MP4, MOV, AVI, MP3, WAV, M4A • Cost: 1 token per 10MB
+                </p>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                  <FileVideo className="h-8 w-8 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-fredoka text-xl font-semibold">{currentVideo.name}</h3>
+                  <p className="text-muted-foreground">
+                    {Math.round(currentVideo.size / (1024 * 1024))}MB • 
+                    Cost: {Math.ceil((currentVideo.size / (1024 * 1024)) / 10)} tokens
+                  </p>
+                </div>
+                
+                {isProcessing && (
+                  <div className="space-y-2">
+                    <Progress value={uploadProgress} className="w-full max-w-md mx-auto" />
+                    <p className="text-sm text-muted-foreground">
+                      {uploadProgress < 90 ? 'Uploading...' : 'Processing with AI...'}
+                    </p>
+                  </div>
+                )}
+                
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCurrentVideo(null);
+                    setTranscriptionResult("");
+                    setUploadProgress(0);
+                  }}
+                  disabled={isProcessing}
+                >
+                  Upload Different File
+                </Button>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+
+        {/* Results */}
+        {transcriptionResult && (
+          <GlassCard className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-fredoka text-lg font-semibold">Generated Subtitles</h3>
+              <Button onClick={downloadSubtitles} size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Download SRT
+              </Button>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4 max-h-60 overflow-y-auto">
+              <pre className="whitespace-pre-wrap text-sm">{transcriptionResult}</pre>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* Token Status */}
+        <GlassCard className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-fredoka text-lg font-semibold">Token Balance</h3>
+              <p className="text-muted-foreground">1 token = 10MB processing</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-primary">{tokenBalance}</div>
+              <Button variant="outline" size="sm" className="mt-2">
+                <Zap className="mr-2 h-4 w-4" />
+                Buy More Tokens
+              </Button>
+            </div>
+          </div>
+        </GlassCard>
       </div>
-      
-      {/* Bottom Status Bar */}
-      <StatusBar />
     </div>
   );
 };
