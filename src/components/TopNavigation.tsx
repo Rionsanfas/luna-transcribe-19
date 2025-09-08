@@ -162,6 +162,9 @@ export const TopNavigation = () => {
                     <DropdownMenuItem asChild>
                       <Link to="/dashboard">Dashboard</Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings">Settings</Link>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={signOut}>
                       Sign Out

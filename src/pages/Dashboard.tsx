@@ -5,6 +5,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { getFileSizeLimit } from "@/components/Pricing";
 import { 
   Upload, 
   FileVideo, 
@@ -103,6 +104,17 @@ const Dashboard = () => {
 
     const fileSizeMB = Math.round(file.size / (1024 * 1024));
     const tokensRequired = Math.ceil(fileSizeMB / 10);
+
+    // Check file size limits based on user's plan (default to free plan)
+    const maxFileSizeMB = getFileSizeLimit("free"); // TODO: Get actual user plan from profile
+    if (fileSizeMB > maxFileSizeMB) {
+      toast({
+        title: "File too large",
+        description: `Maximum file size for your plan is ${maxFileSizeMB}MB. Current file is ${fileSizeMB}MB.`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (tokenBalance < tokensRequired) {
       toast({
@@ -227,11 +239,11 @@ const Dashboard = () => {
                       <span>{tokenBalance} tokens</span>
                     </div>
                   </div>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </DropdownMenuItem>

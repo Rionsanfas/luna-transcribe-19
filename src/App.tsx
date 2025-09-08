@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import RefundPolicy from "./pages/RefundPolicy";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/refund" element={<RefundPolicy />} />
