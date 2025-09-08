@@ -35,10 +35,7 @@ export const Hero = () => {
             AI-Powered Subtitle Generation with Perfect Accuracy
           </h2>
           
-          <p className="text-lg md:text-xl text-muted-foreground/80 mb-12 max-w-3xl mx-auto leading-relaxed">
-            Transform voice to professional subtitles with AI-powered transcription and translation. 
-            Powered by advanced OpenAI models for perfect accuracy.
-          </p>
+          <p className="text-lg md:text-xl text-muted-foreground/80 mb-12 max-w-3xl mx-auto leading-relaxed">Match any subtitle style in a single click</p>
         </div>
 
         {/* CTA buttons */}
@@ -47,7 +44,10 @@ export const Hero = () => {
               Start Transcribing
               <Zap className="ml-2 h-5 w-5" />
             </Button>
-          
+          <Button variant="outline" size="lg" className="group font-fredoka font-medium text-lg px-8 py-4 rounded-2xl border-2 hover:bg-accent/50 transition-all duration-300" onClick={() => window.location.href = '/dashboard'}>
+            <Upload className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" />
+            Try Dashboard
+          </Button>
         </div>
 
         {/* Stats */}
