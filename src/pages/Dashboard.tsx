@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { getFileSizeLimit } from "@/components/Pricing";
+import { TranscriptionSection } from "@/components/dashboard/TranscriptionSection";
+import { TranslationSection } from "@/components/dashboard/TranslationSection";
 import { 
   Upload, 
   FileVideo, 
@@ -17,8 +19,6 @@ import {
   Moon,
   Sun,
   Coins,
-  Play,
-  Pause,
   Download,
   Type,
   Mic
@@ -26,10 +26,6 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -41,9 +37,20 @@ const Dashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<File | null>(null);
   const [transcriptionResult, setTranscriptionResult] = useState<string>("");
+  const [uploadMode, setUploadMode] = useState<'transcribe' | 'translate' | 'match'>('transcribe');
+
+  // Transcription settings
   const [customPrompt, setCustomPrompt] = useState("Transcribe this audio accurately and create properly timed subtitles.");
-  const [targetLanguage, setTargetLanguage] = useState("en");
-  const [uploadMode, setUploadMode] = useState<'transcribe' | 'match'>('transcribe');
+  const [primaryLanguage, setPrimaryLanguage] = useState("en");
+  const [detectLanguages, setDetectLanguages] = useState<string[]>([]);
+  const [autoDetect, setAutoDetect] = useState(true);
+
+  // Translation settings
+  const [sourceLanguage, setSourceLanguage] = useState("en");
+  const [targetLanguages, setTargetLanguages] = useState<string[]>([]);
+  const [translationPrompt, setTranslationPrompt] = useState("");
+  const [preserveFormatting, setPreserveFormatting] = useState(true);
+  const [maintainTiming, setMaintainTiming] = useState(true);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -171,9 +178,9 @@ const Dashboard = () => {
           user_id: user.id,
           original_filename: file.name,
           file_size_mb: Math.round(fileSizeMB),
-          processing_type: uploadMode === 'transcribe' ? 'transcription' : 'style_matching',
+          processing_type: uploadMode === 'transcribe' ? 'transcription' : uploadMode === 'translate' ? 'transcription_translation' : 'style_matching',
           status: 'pending',
-          target_language: targetLanguage
+          target_language: uploadMode === 'transcribe' ? (autoDetect ? 'auto' : primaryLanguage) : sourceLanguage
         })
         .select()
         .single();
@@ -192,26 +199,91 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Authentication failed');
 
-      // Call the backend function
-      const { data, error } = await supabase.functions.invoke('generate-subtitles', {
-        body: {
-          videoData: base64,
-          videoSize: file.size,
-          videoJobId: videoJob.id,
-          customPrompt: customPrompt,
-          targetLanguage: targetLanguage,
-          uploadMode: uploadMode
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      let processingData;
+      
+      if (uploadMode === 'transcribe') {
+        // Call transcription function
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+          body: {
+            videoData: base64,
+            videoSize: file.size,
+            videoJobId: videoJob.id,
+            customPrompt: customPrompt,
+            primaryLanguage: autoDetect ? null : primaryLanguage,
+            detectLanguages: autoDetect ? [] : detectLanguages,
+            autoDetect: autoDetect,
+            uploadMode: uploadMode
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (error) throw error;
+        processingData = data;
+      } else if (uploadMode === 'translate') {
+        // First transcribe, then translate
+        const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('generate-subtitles', {
+          body: {
+            videoData: base64,
+            videoSize: file.size,
+            videoJobId: videoJob.id,
+            customPrompt: customPrompt,
+            primaryLanguage: sourceLanguage,
+            detectLanguages: [],
+            autoDetect: false,
+            uploadMode: 'transcribe'
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (transcribeError) throw transcribeError;
+        
+        // Then translate to target languages
+        if (targetLanguages.length > 0) {
+          const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-subtitles', {
+            body: {
+              videoJobId: videoJob.id,
+              sourceLanguage: sourceLanguage,
+              targetLanguages: targetLanguages,
+              translationPrompt: translationPrompt,
+              preserveFormatting: preserveFormatting,
+              maintainTiming: maintainTiming
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+          
+          if (translateError) throw translateError;
+          processingData = { ...transcribeData, ...translateData };
+        } else {
+          processingData = transcribeData;
+        }
+      } else {
+        // Style matching mode
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+          body: {
+            videoData: base64,
+            videoSize: file.size,
+            videoJobId: videoJob.id,
+            customPrompt: customPrompt,
+            uploadMode: uploadMode
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (error) throw error;
+        processingData = data;
+      }
 
       setUploadProgress(100);
 
-      if (error) throw error;
-
-      setTranscriptionResult(data?.transcription || "Processing completed successfully!");
+      setTranscriptionResult(processingData?.transcription || "Processing completed successfully!");
       
       toast({
         title: "Processing complete!",
@@ -346,10 +418,10 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Upload Mode Selection */}
+        {/* Processing Mode Selection */}
         <GlassCard className="p-4 md:p-6">
-          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Choose Upload Mode</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Choose Processing Mode</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
             <Button
               variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
               onClick={() => setUploadMode('transcribe')}
@@ -357,7 +429,16 @@ const Dashboard = () => {
             >
               <Mic className="h-6 md:h-8 w-6 md:w-8" />
               <span className="font-medium text-sm md:text-base font-fredoka">Transcribe Audio</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Extract speech from video/audio and generate subtitles</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Extract speech from video and generate subtitles</span>
+            </Button>
+            <Button
+              variant={uploadMode === 'translate' ? 'default' : 'outline'}
+              onClick={() => setUploadMode('translate')}
+              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
+            >
+              <Languages className="h-6 md:h-8 w-6 md:w-8" />
+              <span className="font-medium text-sm md:text-base font-fredoka">Transcribe & Translate</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Generate subtitles in multiple languages</span>
             </Button>
             <Button
               variant={uploadMode === 'match' ? 'default' : 'outline'}
@@ -371,42 +452,32 @@ const Dashboard = () => {
           </div>
         </GlassCard>
 
-        {/* AI Settings */}
-        <GlassCard className="p-4 md:p-6">
-          <h3 className="font-fredoka text-base md:text-lg font-semibold mb-4 text-foreground">AI Configuration</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="custom-prompt" className="text-sm font-medium font-fredoka text-foreground">Custom AI Prompt</Label>
-              <Textarea
-                id="custom-prompt"
-                value={customPrompt}
-                onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="Describe how you want the AI to process your audio..."
-                className="min-h-24 md:min-h-20 text-sm resize-none font-fredoka"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="target-language" className="text-sm font-medium font-fredoka text-foreground">Target Language</Label>
-              <Select value={targetLanguage} onValueChange={setTargetLanguage}>
-                <SelectTrigger className="min-h-[44px] font-fredoka">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Spanish</SelectItem>
-                  <SelectItem value="fr">French</SelectItem>
-                  <SelectItem value="de">German</SelectItem>
-                  <SelectItem value="it">Italian</SelectItem>
-                  <SelectItem value="pt">Portuguese</SelectItem>
-                  <SelectItem value="ru">Russian</SelectItem>
-                  <SelectItem value="ja">Japanese</SelectItem>
-                  <SelectItem value="ko">Korean</SelectItem>
-                  <SelectItem value="zh">Chinese</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </GlassCard>
+        {/* AI Processing Settings */}
+        <TranscriptionSection
+          isActive={uploadMode === 'transcribe'}
+          customPrompt={customPrompt}
+          onCustomPromptChange={setCustomPrompt}
+          primaryLanguage={primaryLanguage}
+          onPrimaryLanguageChange={setPrimaryLanguage}
+          detectLanguages={detectLanguages}
+          onDetectLanguagesChange={setDetectLanguages}
+          autoDetect={autoDetect}
+          onAutoDetectChange={setAutoDetect}
+        />
+
+        <TranslationSection
+          isActive={uploadMode === 'translate'}
+          sourceLanguage={sourceLanguage}
+          onSourceLanguageChange={setSourceLanguage}
+          targetLanguages={targetLanguages}
+          onTargetLanguagesChange={setTargetLanguages}
+          translationPrompt={translationPrompt}
+          onTranslationPromptChange={setTranslationPrompt}
+          preserveFormatting={preserveFormatting}
+          onPreserveFormattingChange={setPreserveFormatting}
+          maintainTiming={maintainTiming}
+          onMaintainTimingChange={setMaintainTiming}
+        />
 
         {/* Upload Area */}
         <GlassCard 
@@ -451,8 +522,11 @@ const Dashboard = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground px-4 leading-relaxed font-fredoka">
-                  Supported: MP4, MOV, AVI, MP3, WAV, M4A<br className="md:hidden" />
-                  <span className="md:ml-2">Cost: 1 token per 10MB</span>
+                  {uploadMode === 'match' ? 'Supported: MP4, MOV, AVI + Images (PNG, JPG)' : 'Supported: MP4, MOV, AVI (video only)'}<br className="md:hidden" />
+                  <span className="md:ml-2">
+                    Cost: 1 token per 10MB
+                    {uploadMode === 'translate' && ' + 15 tokens per translation language'}
+                  </span>
                 </p>
               </>
             ) : (
@@ -465,6 +539,9 @@ const Dashboard = () => {
                   <p className="text-muted-foreground text-sm md:text-base font-fredoka">
                     {Math.round(currentVideo.size / (1024 * 1024))}MB • 
                     Cost: {((currentVideo.size / (1024 * 1024)) / 10).toFixed(1)} tokens
+                    {uploadMode === 'translate' && targetLanguages.length > 0 && (
+                      <span> + {targetLanguages.length * 15} translation tokens</span>
+                    )}
                   </p>
                 </div>
                 

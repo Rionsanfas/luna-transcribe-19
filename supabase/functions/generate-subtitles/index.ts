@@ -45,7 +45,16 @@ serve(async (req) => {
       );
     }
 
-    const { videoData, videoSize, videoJobId, customPrompt, targetLanguage, uploadMode } = await req.json();
+    const { 
+      videoData, 
+      videoSize, 
+      videoJobId, 
+      customPrompt, 
+      primaryLanguage,
+      detectLanguages,
+      autoDetect,
+      uploadMode 
+    } = await req.json();
 
     if (!videoData || !videoSize || !videoJobId) {
       return new Response(
@@ -151,10 +160,20 @@ serve(async (req) => {
       formData.append('prompt', customPrompt.trim());
     }
     
-    // Add language if specified
-    if (targetLanguage && targetLanguage !== 'en') {
-      formData.append('language', targetLanguage);
+    // Add language configuration based on user settings
+    if (!autoDetect) {
+      if (primaryLanguage && primaryLanguage !== 'en') {
+        formData.append('language', primaryLanguage);
+      }
+      
+      // Note: OpenAI Whisper doesn't support multiple language detection in single request
+      // For multiple languages, we rely on auto-detection or process separately
+      if (detectLanguages?.length > 0) {
+        // Log additional languages for potential future processing
+        console.log('Additional languages requested:', detectLanguages);
+      }
     }
+    // If autoDetect is true, let Whisper automatically detect the language
 
     // Call OpenAI Whisper API
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
