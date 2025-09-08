@@ -12,6 +12,7 @@ import { VideoEditingProvider } from "@/contexts/VideoEditingContext";
 import { VideoPreview } from "@/components/dashboard/VideoPreview";
 import { SubtitleEditor } from "@/components/dashboard/SubtitleEditor";
 import { EditingControls } from "@/components/dashboard/EditingControls";
+import { StyleMatchingSection } from "@/components/dashboard/StyleMatchingSection";
 import { 
   Upload, 
   FileVideo, 
@@ -41,7 +42,7 @@ const Dashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<File | null>(null);
   const [transcriptionResult, setTranscriptionResult] = useState<string>("");
-  const [uploadMode, setUploadMode] = useState<'transcribe' | 'translate' | 'match'>('transcribe');
+  const [uploadMode, setUploadMode] = useState<'transcribe' | 'translate' | 'match' | 'style-match'>('transcribe');
 
   // Transcription settings
   const [customPrompt, setCustomPrompt] = useState("Transcribe this audio accurately and create properly timed subtitles.");
@@ -104,19 +105,29 @@ const Dashboard = () => {
   };
 
   const handleVideoUpload = async (file: File) => {
-    // Validate file type - only videos allowed (except for matching styles feature)
-    if (uploadMode === 'match') {
-      // For matching styles, allow videos and images
+    // Validate file type based on upload mode
+    if (uploadMode === 'style-match') {
+      // Style matching mode - images only
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type", 
+          description: "Please upload an image file for style matching.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (uploadMode === 'match') {
+      // For matching subtitle timing, allow videos and images
       if (!file.type.startsWith('video/') && !file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
-          description: "Please upload a video file or an image for style matching.",
+          description: "Please upload a video file or an image for subtitle matching.",
           variant: "destructive",
         });
         return;
       }
     } else {
-      // For transcription, only videos allowed
+      // For transcription and translation, only videos allowed
       if (!file.type.startsWith('video/')) {
         toast({
           title: "Invalid file type",
@@ -425,7 +436,7 @@ const Dashboard = () => {
         {/* Processing Mode Selection */}
         <GlassCard className="p-4 md:p-6">
           <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Choose Processing Mode</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 md:gap-4">
             <Button
               variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
               onClick={() => setUploadMode('transcribe')}
@@ -452,6 +463,15 @@ const Dashboard = () => {
               <Type className="h-6 md:h-8 w-6 md:w-8" />
               <span className="font-medium text-sm md:text-base font-fredoka">Match Existing Subtitles</span>
               <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Sync existing text with video timing</span>
+            </Button>
+            <Button
+              variant={uploadMode === 'style-match' ? 'default' : 'outline'}
+              onClick={() => setUploadMode('style-match')}
+              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
+            >
+              <Zap className="h-6 md:h-8 w-6 md:w-8" />
+              <span className="font-medium text-sm md:text-base font-fredoka">Match Subtitle Style</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Analyze and copy styling from reference images</span>
             </Button>
           </div>
         </GlassCard>
@@ -482,6 +502,19 @@ const Dashboard = () => {
           maintainTiming={maintainTiming}
           onMaintainTimingChange={setMaintainTiming}
         />
+
+        {/* Style Matching Section */}
+        {uploadMode === 'style-match' && (
+          <StyleMatchingSection
+            onStyleMatch={(matchedStyle) => {
+              console.log('Style matched:', matchedStyle);
+              toast({
+                title: "Style Analysis Complete",
+                description: `Detected subtitle styling with ${Math.round(matchedStyle.confidence * 100)}% confidence`,
+              });
+            }}
+          />
+        )}
 
         {/* Upload Area */}
         <GlassCard 
