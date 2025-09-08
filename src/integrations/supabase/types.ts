@@ -50,6 +50,42 @@ export type Database = {
         }
         Relationships: []
       }
+      style_analysis_logs: {
+        Row: {
+          confidence: number
+          created_at: string
+          custom_prompt: string | null
+          detected_style: Json
+          id: string
+          image_format: string
+          raw_response: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          custom_prompt?: string | null
+          detected_style: Json
+          id?: string
+          image_format: string
+          raw_response?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          custom_prompt?: string | null
+          detected_style?: Json
+          id?: string
+          image_format?: string
+          raw_response?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           billing_cycle: string | null
