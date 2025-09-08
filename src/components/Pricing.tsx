@@ -122,10 +122,10 @@ export const Pricing = () => {
       
       <div className="relative z-20 max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-fredoka font-bold mb-6">
+          <h2 className="text-4xl md:text-5xl font-fredoka font-bold mb-6 text-foreground">
             Choose Your <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Plan</span>
           </h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="font-fredoka text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Get started with our flexible pricing options designed for every creator's needs
           </p>
           
@@ -153,11 +153,67 @@ export const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto overflow-x-auto">
+          <div className="lg:hidden grid grid-cols-1 gap-8">
+            {currentPlans.map((plan, index) => (
+              <GlassCard 
+                key={`mobile-${index}`} 
+                className={`relative transition-all duration-500 hover:scale-105 ${
+                  plan.popular ? 'scale-105 shadow-glow-strong border-primary/20' : 'hover:shadow-glow-soft'
+                } rounded-3xl p-8`}
+                style={{
+                  animationDelay: `${index * 150}ms`,
+                  animation: 'fade-in 0.8s ease-out forwards'
+                }}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-primary text-primary-foreground px-4 py-1 rounded-full font-fredoka">
+                      <Star className="h-3 w-3 mr-1" />
+                      Most Popular
+                    </Badge>
+                  </div>
+                )}
+                
+                <div className="text-center mb-6">
+                  <h3 className="font-fredoka text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
+                  <div className="flex items-baseline justify-center gap-1 mb-1">
+                    <span className="text-4xl font-bold text-foreground">{plan.price}</span>
+                    <span className="text-lg text-muted-foreground">{plan.period}</span>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <span className="font-fredoka font-medium text-primary">{plan.tokens}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{plan.description}</p>
+                </div>
+
+                <Button 
+                  size="lg" 
+                  variant={plan.popular ? "default" : "outline"} 
+                  className="w-full mb-6 font-fredoka font-medium rounded-xl" 
+                  onClick={() => window.location.href = '/dashboard'}
+                >
+                  Get Started
+                </Button>
+
+                <ul className="space-y-3">
+                  {plan.features.map((feature, featureIndex) => (
+                    <li key={featureIndex} className="flex items-start gap-3">
+                      <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-foreground">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </GlassCard>
+            ))}
+          </div>
+          
+          {/* Desktop layout - all in one row */}
           {currentPlans.map((plan, index) => (
             <GlassCard 
-              key={index} 
-              className={`relative transition-all duration-500 hover:scale-105 ${
+              key={`desktop-${index}`} 
+              className={`relative transition-all duration-500 hover:scale-105 hidden lg:flex lg:flex-col ${
                 plan.popular ? 'scale-105 shadow-glow-strong border-primary/20' : 'hover:shadow-glow-soft'
               } rounded-3xl p-8`}
               style={{
@@ -175,9 +231,9 @@ export const Pricing = () => {
               )}
               
               <div className="text-center mb-6">
-                <h3 className="font-fredoka text-2xl font-bold mb-2">{plan.name}</h3>
+                <h3 className="font-fredoka text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
                 <div className="flex items-baseline justify-center gap-1 mb-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-4xl font-bold text-foreground">{plan.price}</span>
                   <span className="text-lg text-muted-foreground">{plan.period}</span>
                 </div>
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -200,7 +256,7 @@ export const Pricing = () => {
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start gap-3">
                     <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature}</span>
+                    <span className="text-sm text-foreground">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -211,7 +267,7 @@ export const Pricing = () => {
         {/* Token explanation */}
         <div className="mt-16 text-center">
           <GlassCard className="p-6 max-w-2xl mx-auto">
-            <h3 className="font-fredoka text-xl font-bold mb-3">How Tokens Work</h3>
+            <h3 className="font-fredoka text-xl font-bold mb-3 text-foreground">How Tokens Work</h3>
             <p className="text-muted-foreground">
               1 token = 10MB of video processing. Tokens are used for AI subtitle generation and video export. 
               Unused tokens never expire, giving you complete flexibility.

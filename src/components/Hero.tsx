@@ -19,15 +19,15 @@ export const Hero = () => {
       {/* Hero content */}
       <div className="relative z-20 max-w-5xl mx-auto text-center pointer-events-auto">
         <div className="animate-fade-in">
-          <h1 className="font-fredoka font-bold text-5xl md:text-7xl lg:text-8xl mb-4 bg-gradient-to-r from-foreground via-muted-foreground to-foreground bg-clip-text text-transparent">
+          <h1 className="font-fredoka font-bold text-5xl md:text-7xl lg:text-8xl mb-4 text-foreground">
             Transform Video to Subtitles
           </h1>
           
-          <h2 className="font-motley text-xl md:text-3xl lg:text-4xl mb-8 text-muted-foreground">
+          <h2 className="font-fredoka text-xl md:text-3xl lg:text-4xl mb-8 text-muted-foreground">
             AI-Powered Subtitle Generation with Perfect Accuracy
           </h2>
           
-          <p className="text-lg md:text-xl text-muted-foreground/80 mb-12 max-w-3xl mx-auto leading-relaxed">
+          <p className="font-fredoka text-lg md:text-xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
             Transform voice to professional subtitles with AI-powered transcription and translation. 
             Powered by advanced OpenAI models for perfect accuracy.
           </p>
@@ -60,8 +60,8 @@ export const Hero = () => {
           ].map((stat, index) => (
             <GlassCard key={index} variant="hover" className="text-center">
               <stat.icon className="h-8 w-8 mx-auto mb-3 text-primary" />
-              <div className="font-fredoka text-2xl font-bold mb-1">{stat.value}</div>
-              <div className="text-sm text-muted-foreground">{stat.label}</div>
+              <div className="font-fredoka text-2xl font-bold mb-1 text-foreground">{stat.value}</div>
+              <div className="font-fredoka text-sm text-muted-foreground">{stat.label}</div>
             </GlassCard>
           ))}
         </div>

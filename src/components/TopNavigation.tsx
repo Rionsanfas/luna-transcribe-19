@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Coins, Menu, X } from "lucide-react";
+import { User, Coins, Menu, X, Sun, Moon } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
@@ -22,6 +22,7 @@ import {
 export const TopNavigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const { user, signOut, tokenBalance } = useAuth();
   const isMobile = useIsMobile();
 
@@ -30,14 +31,27 @@ export const TopNavigation = () => {
       setIsScrolled(window.scrollY > 50);
     };
 
+    // Check initial theme
+    setIsDark(document.documentElement.classList.contains('dark'));
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const toggleTheme = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled 
-        ? 'bg-card/95 backdrop-blur-md border-b border-border/50 py-2 shadow-lg' 
+        ? 'bg-card/95 backdrop-blur-md border-b border-border/50 py-2 shadow-lg rounded-b-3xl mx-4' 
         : 'bg-card/60 backdrop-blur-sm py-4 md:py-6'
     }`}>
       <div className="container mx-auto">
@@ -127,8 +141,19 @@ export const TopNavigation = () => {
             </Link>
           </div>
 
-          {/* Right Section - Auth */}
+          {/* Right Section - Theme Toggle & Auth */}
           <div className="flex items-center space-x-2 md:space-x-3">
+            {/* Theme Toggle */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={toggleTheme}
+              className={`min-h-[44px] ${
+                isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             {user ? (
               <div className="flex items-center space-x-2 md:space-x-3">
                 {/* Token Balance - Hidden on very small screens */}
