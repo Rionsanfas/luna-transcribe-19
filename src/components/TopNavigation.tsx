@@ -167,8 +167,8 @@ export const TopNavigation = () => {
                 {/* User Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className={`flex items-center space-x-2 min-h-[44px] ${
-                      isScrolled ? 'text-card-foreground/90 hover:text-card-foreground hover:bg-accent' : ''
+                    <Button variant="ghost" size="sm" className={`flex items-center space-x-2 min-h-[44px] font-fredoka ${
+                      isScrolled ? 'text-card-foreground hover:text-card-foreground hover:bg-accent' : 'text-foreground'
                     }`}>
                       <User className="h-4 w-4" />
                       <span className="hidden md:block">{user.email?.split('@')[0]}</span>

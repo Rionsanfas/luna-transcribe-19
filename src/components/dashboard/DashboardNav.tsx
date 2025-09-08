@@ -105,22 +105,22 @@ export const DashboardNav = () => {
       <GlassCard className="flex items-center justify-between py-3 px-6">
         {/* Logo */}
         <div className="flex items-center">
-          <span className="font-fredoka text-xl font-semibold">SubAI</span>
+          <span className="font-fredoka text-xl font-semibold text-foreground">SubAI</span>
         </div>
 
         {/* Navigation Links */}
         <div className="hidden md:flex items-center space-x-6">
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" className="text-foreground font-fredoka">
             <Home className="w-4 h-4 mr-2" />
             Dashboard
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" className="text-foreground font-fredoka">
             Projects
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" className="text-foreground font-fredoka">
             Templates
           </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
+          <Button variant="ghost" size="sm" className="text-foreground font-fredoka">
             <HelpCircle className="w-4 h-4 mr-2" />
             Help
           </Button>
@@ -133,7 +133,7 @@ export const DashboardNav = () => {
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className="text-muted-foreground"
+            className="text-foreground"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </Button>
@@ -151,9 +151,9 @@ export const DashboardNav = () => {
             <DropdownMenuContent className="w-56" align="end">
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-1 leading-none">
-                  <p className="text-sm font-medium">{user?.email?.split('@')[0] || 'User'}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                  <p className="text-xs text-primary font-medium">{tokenBalance} tokens</p>
+                  <p className="text-sm font-medium font-fredoka text-foreground">{user?.email?.split('@')[0] || 'User'}</p>
+                  <p className="text-xs text-muted-foreground font-fredoka">{user?.email}</p>
+                  <p className="text-xs text-primary font-medium font-fredoka">{tokenBalance} tokens</p>
                 </div>
               </div>
               <DropdownMenuSeparator />

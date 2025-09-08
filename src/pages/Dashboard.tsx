@@ -223,7 +223,7 @@ const Dashboard = () => {
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden sm:flex flex-col items-start text-sm">
-                     <span className="text-card-foreground text-xs md:text-sm">{user?.email}</span>
+                      <span className="text-foreground font-fredoka text-xs md:text-sm">{user?.email}</span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Coins className="h-3 w-3" />
                         <span>{tokenBalance} tokens</span>
@@ -233,7 +233,7 @@ const Dashboard = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-2 text-sm sm:hidden">
-                    <p className="font-medium">{user?.email}</p>
+                    <p className="font-medium font-fredoka text-foreground">{user?.email}</p>
                     <div className="flex items-center gap-1 mt-1 text-xs text-primary">
                       <Coins className="h-3 w-3" />
                       <span>{tokenBalance} tokens</span>
@@ -264,7 +264,7 @@ const Dashboard = () => {
         {/* Header */}
               <div className="text-center space-y-3 md:space-y-4 pt-4">
           <h1 className="font-fredoka text-2xl md:text-4xl font-bold text-foreground">AI Voice Transcription</h1>
-          <p className="text-lg md:text-xl text-foreground max-w-2xl mx-auto px-4">
+          <p className="font-fredoka text-lg md:text-xl text-foreground max-w-2xl mx-auto px-4">
             Transform your audio and video files into professional subtitles with AI-powered transcription
           </p>
         </div>
@@ -279,8 +279,8 @@ const Dashboard = () => {
               className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
             >
               <Mic className="h-6 md:h-8 w-6 md:w-8" />
-              <span className="font-medium text-sm md:text-base">Transcribe Audio</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight">Extract speech from video/audio and generate subtitles</span>
+              <span className="font-medium text-sm md:text-base font-fredoka">Transcribe Audio</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Extract speech from video/audio and generate subtitles</span>
             </Button>
             <Button
               variant={uploadMode === 'match' ? 'default' : 'outline'}
@@ -288,8 +288,8 @@ const Dashboard = () => {
               className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
             >
               <Type className="h-6 md:h-8 w-6 md:w-8" />
-              <span className="font-medium text-sm md:text-base">Match Existing Subtitles</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight">Sync existing text with video timing</span>
+              <span className="font-medium text-sm md:text-base font-fredoka">Match Existing Subtitles</span>
+              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Sync existing text with video timing</span>
             </Button>
           </div>
         </GlassCard>
@@ -299,19 +299,19 @@ const Dashboard = () => {
           <h3 className="font-fredoka text-base md:text-lg font-semibold mb-4 text-foreground">AI Configuration</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-2">
-              <Label htmlFor="custom-prompt" className="text-sm font-medium">Custom AI Prompt</Label>
+              <Label htmlFor="custom-prompt" className="text-sm font-medium font-fredoka text-foreground">Custom AI Prompt</Label>
               <Textarea
                 id="custom-prompt"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Describe how you want the AI to process your audio..."
-                className="min-h-24 md:min-h-20 text-sm resize-none"
+                className="min-h-24 md:min-h-20 text-sm resize-none font-fredoka"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="target-language" className="text-sm font-medium">Target Language</Label>
+              <Label htmlFor="target-language" className="text-sm font-medium font-fredoka text-foreground">Target Language</Label>
               <Select value={targetLanguage} onValueChange={setTargetLanguage}>
-                <SelectTrigger className="min-h-[44px]">
+                <SelectTrigger className="min-h-[44px] font-fredoka">
                   <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
@@ -351,10 +351,10 @@ const Dashboard = () => {
                   )}
                 </div>
                 <div>
-                  <h3 className="font-fredoka text-lg md:text-xl font-semibold">
+                  <h3 className="font-fredoka text-lg md:text-xl font-semibold text-foreground">
                     {uploadMode === 'transcribe' ? 'Upload Video or Audio' : 'Upload Video for Subtitle Matching'}
                   </h3>
-                  <p className="text-muted-foreground mt-2 text-sm md:text-base px-4">
+                  <p className="text-muted-foreground mt-2 text-sm md:text-base px-4 font-fredoka">
                     Drag and drop your files here, or tap to browse
                   </p>
                 </div>
@@ -366,14 +366,14 @@ const Dashboard = () => {
                     className="hidden"
                     id="file-upload"
                   />
-                  <Button asChild className="font-medium min-h-[48px] px-6 md:px-8 touch-manipulation">
+                  <Button asChild className="font-medium min-h-[48px] px-6 md:px-8 touch-manipulation font-fredoka">
                     <label htmlFor="file-upload" className="cursor-pointer">
                       <Upload className="mr-2 h-4 w-4" />
                       Choose File
                     </label>
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground px-4 leading-relaxed">
+                <p className="text-xs text-muted-foreground px-4 leading-relaxed font-fredoka">
                   Supported: MP4, MOV, AVI, MP3, WAV, M4A<br className="md:hidden" />
                   <span className="md:ml-2">Cost: 1 token per 10MB</span>
                 </p>
@@ -384,8 +384,8 @@ const Dashboard = () => {
                   <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4">{currentVideo.name}</h3>
-                  <p className="text-muted-foreground text-sm md:text-base">
+                  <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4 text-foreground">{currentVideo.name}</h3>
+                  <p className="text-muted-foreground text-sm md:text-base font-fredoka">
                     {Math.round(currentVideo.size / (1024 * 1024))}MB • 
                     Cost: {Math.ceil((currentVideo.size / (1024 * 1024)) / 10)} tokens
                   </p>
@@ -394,7 +394,7 @@ const Dashboard = () => {
                 {isProcessing && (
                   <div className="space-y-2 px-4">
                     <Progress value={uploadProgress} className="w-full max-w-md mx-auto" />
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground font-fredoka">
                       {uploadProgress < 90 ? 'Uploading...' : 'Processing with AI...'}
                     </p>
                   </div>
@@ -408,7 +408,7 @@ const Dashboard = () => {
                     setUploadProgress(0);
                   }}
                   disabled={isProcessing}
-                  className="min-h-[44px] touch-manipulation"
+                  className="min-h-[44px] touch-manipulation font-fredoka"
                 >
                   Upload Different File
                 </Button>
@@ -421,8 +421,8 @@ const Dashboard = () => {
         {transcriptionResult && (
           <GlassCard className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
-              <h3 className="font-fredoka text-base md:text-lg font-semibold">Generated Subtitles</h3>
-              <Button onClick={downloadSubtitles} size="sm" className="min-h-[44px] touch-manipulation">
+              <h3 className="font-fredoka text-base md:text-lg font-semibold text-foreground">Generated Subtitles</h3>
+              <Button onClick={downloadSubtitles} size="sm" className="min-h-[44px] touch-manipulation font-fredoka">
                 <Download className="mr-2 h-4 w-4" />
                 Download SRT
               </Button>
@@ -437,12 +437,12 @@ const Dashboard = () => {
         <GlassCard className="p-4 md:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-fredoka text-base md:text-lg font-semibold">Token Balance</h3>
-              <p className="text-muted-foreground text-sm">1 token = 10MB processing</p>
+              <h3 className="font-fredoka text-base md:text-lg font-semibold text-foreground">Token Balance</h3>
+              <p className="text-muted-foreground text-sm font-fredoka">1 token = 10MB processing</p>
             </div>
             <div className="text-center sm:text-right">
-              <div className="text-xl md:text-2xl font-bold text-primary">{tokenBalance}</div>
-              <Button variant="outline" size="sm" className="mt-2 min-h-[44px] touch-manipulation">
+              <div className="text-xl md:text-2xl font-bold text-primary font-fredoka">{tokenBalance}</div>
+              <Button variant="outline" size="sm" className="mt-2 min-h-[44px] touch-manipulation font-fredoka">
                 <Zap className="mr-2 h-4 w-4" />
                 Buy More Tokens
               </Button>

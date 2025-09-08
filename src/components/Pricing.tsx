@@ -153,7 +153,7 @@ export const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto overflow-x-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           <div className="lg:hidden grid grid-cols-1 gap-8">
             {currentPlans.map((plan, index) => (
               <GlassCard 
@@ -166,14 +166,13 @@ export const Pricing = () => {
                   animation: 'fade-in 0.8s ease-out forwards'
                 }}
               >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground px-4 py-1 rounded-full font-fredoka">
-                      <Star className="h-3 w-3 mr-1" />
-                      Most Popular
-                    </Badge>
-                  </div>
-                )}
+              {plan.popular && (
+                <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
+                  <Badge className="bg-primary text-primary-foreground px-4 py-2 rounded-full font-fredoka shadow-lg">
+                    Most Popular
+                  </Badge>
+                </div>
+              )}
                 
                 <div className="text-center mb-6">
                   <h3 className="font-fredoka text-2xl font-bold mb-2 text-foreground">{plan.name}</h3>
@@ -191,7 +190,9 @@ export const Pricing = () => {
                 <Button 
                   size="lg" 
                   variant={plan.popular ? "default" : "outline"} 
-                  className="w-full mb-6 font-fredoka font-medium rounded-xl" 
+                  className={`w-full mb-6 font-fredoka font-medium rounded-xl ${
+                    plan.popular ? 'text-primary-foreground' : 'text-foreground hover:text-foreground'
+                  }`}
                   onClick={() => window.location.href = '/dashboard'}
                 >
                   Get Started
@@ -222,9 +223,8 @@ export const Pricing = () => {
               }}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-4 py-1 rounded-full font-fredoka">
-                    <Star className="h-3 w-3 mr-1" />
+                <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10">
+                  <Badge className="bg-primary text-primary-foreground px-4 py-2 rounded-full font-fredoka shadow-lg">
                     Most Popular
                   </Badge>
                 </div>
@@ -246,7 +246,9 @@ export const Pricing = () => {
               <Button 
                 size="lg" 
                 variant={plan.popular ? "default" : "outline"} 
-                className="w-full mb-6 font-fredoka font-medium rounded-xl" 
+                className={`w-full mb-6 font-fredoka font-medium rounded-xl ${
+                  plan.popular ? 'text-primary-foreground' : 'text-foreground hover:text-foreground'
+                }`}
                 onClick={() => window.location.href = '/dashboard'}
               >
                 Get Started
