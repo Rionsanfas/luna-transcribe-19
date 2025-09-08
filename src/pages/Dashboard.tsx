@@ -131,6 +131,18 @@ const Dashboard = () => {
     const fileSizeMB = Math.round(file.size / (1024 * 1024));
     const tokensRequired = Math.ceil(fileSizeMB / 10);
 
+    // Check file size limits based on subscription plan
+    // For now, using basic limits - this will be enhanced with actual subscription checking
+    const maxSizeMB = 250; // Free plan limit
+    if (fileSizeMB > maxSizeMB) {
+      toast({
+        title: "File too large",
+        description: `File size (${fileSizeMB}MB) exceeds the ${maxSizeMB}MB limit for your plan. Upgrade for larger files.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (tokenBalance < tokensRequired) {
       toast({
         title: "Insufficient tokens",
@@ -252,9 +264,9 @@ const Dashboard = () => {
                       <span>{tokenBalance} tokens</span>
                     </div>
                   </div>
-                  <DropdownMenuItem className="text-foreground">
+                  <DropdownMenuItem onClick={() => navigate('/settings')} className="text-foreground">
                     <User className="mr-2 h-4 w-4" />
-                    Profile
+                    Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleBillingClick} className="text-foreground">
                     <Settings className="mr-2 h-4 w-4" />

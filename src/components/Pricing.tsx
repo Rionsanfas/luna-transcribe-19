@@ -10,7 +10,7 @@ const monthlyPlans = [{
   period: "/month",
   tokens: "100 tokens",
   description: "Ideal for individual users or small creators",
-  features: ["100 tokens/month", "Video transcription and translation", "25 languages supported", "Secure video storage", "Basic support", "Unused tokens don't expire"],
+  features: ["100 tokens/month", "Video transcription and translation", "25 languages supported", "100-250 MB max file size", "Secure video storage", "Basic support", "Unused tokens don't expire"],
   popular: false,
   productId: "81152fa6-ca1a-465f-9c3d-384dc8c6a8a9",
   checkoutUrl: "https://buy.polar.sh/polar_cl_kMANTyyNaBCkcfUo1aJ5uKu2DkhBF4ipQYJem43NY6W"
@@ -20,7 +20,7 @@ const monthlyPlans = [{
   period: "/month",
   tokens: "500 tokens",
   description: "Suited for growing creators or small businesses",
-  features: ["500 tokens/month", "All Basic features", "Priority support", "Custom subtitle styling", "Font, size, position options", "Advanced processing"],
+  features: ["500 tokens/month", "All Basic features", "500 MB - 1 GB max file size", "Priority support", "Custom subtitle styling", "Font, size, position options", "Advanced processing"],
   popular: true,
   productId: "fafc1617-826a-4f61-ba37-3fe0a1dce8d9",
   checkoutUrl: "https://buy.polar.sh/polar_cl_Tliw1m9lc7bcQ3EfSWBenC5i2s22ujnKHy26r0pfiil"
@@ -30,7 +30,7 @@ const monthlyPlans = [{
   period: "/month",
   tokens: "1,800 tokens",
   description: "Designed for professional users or businesses",
-  features: ["1,800 tokens/month", "All Pro features", "Enhanced processing speed", "Advanced customization options", "Priority processing queue", "Dedicated support"],
+  features: ["1,800 tokens/month", "All Pro features", "2-5 GB max file size", "Enhanced processing speed", "Advanced customization options", "Priority processing queue", "Dedicated support"],
   popular: false,
   productId: "e2a82b41-2a06-46b9-84ea-d196f758f2b2",
   checkoutUrl: "https://buy.polar.sh/polar_cl_Y3Znzem1OYAsPCF3hSxP6dkoG44iYrKgPAHic1MjMOi"
@@ -40,7 +40,7 @@ const monthlyPlans = [{
   period: "",
   tokens: "Variable tokens",
   description: "Tailored for enterprises or high-volume users",
-  features: ["Flexible token allocation", "Personalized support", "Custom integrations", "Enterprise SLA", "Dedicated account manager", "Custom pricing negotiation"],
+  features: ["Flexible token allocation", "Unlimited file size", "Personalized support", "Custom integrations", "Enterprise SLA", "Dedicated account manager", "Custom pricing negotiation"],
   popular: false,
   productId: "dbf10011-1973-4639-9723-81fd8d4f96c1",
   checkoutUrl: "https://buy.polar.sh/polar_cl_6vL2qZ4pIDPkzWZsXAeHcIFYlojx5TJKvklIW1UMhPO"
@@ -52,7 +52,7 @@ const yearlyPlans = [{
   period: "/year",
   tokens: "1,200 tokens",
   description: "Ideal for individual users or small creators",
-  features: ["1,200 tokens/year", "Video transcription and translation", "25 languages supported", "Secure video storage", "Basic support", "20% yearly savings"],
+  features: ["1,200 tokens/year", "Video transcription and translation", "25 languages supported", "100-250 MB max file size", "Secure video storage", "Basic support", "20% yearly savings"],
   popular: false,
   productId: "64da80d5-3fe4-4a76-84d0-e56c607ffe61",
   checkoutUrl: "https://buy.polar.sh/polar_cl_sHe3MBHYXlwezDiO7cAj8ZnRQTtD6MhE7pwgy0H05YD"
@@ -62,7 +62,7 @@ const yearlyPlans = [{
   period: "/year",
   tokens: "6,000 tokens",
   description: "Suited for growing creators or small businesses",
-  features: ["6,000 tokens/year", "All Basic features", "Priority support", "Custom subtitle styling", "Font, size, position options", "20% yearly savings"],
+  features: ["6,000 tokens/year", "All Basic features", "500 MB - 1 GB max file size", "Priority support", "Custom subtitle styling", "Font, size, position options", "20% yearly savings"],
   popular: true,
   productId: "2540c60b-9ef0-4c22-a1ce-7c2ab2ba9fda",
   checkoutUrl: "https://buy.polar.sh/polar_cl_m2n4kxBPT0WBtyNKWHo6wN05Wk7QmNMfkx6eU0zkM4k"
@@ -72,7 +72,7 @@ const yearlyPlans = [{
   period: "/year",
   tokens: "21,600 tokens",
   description: "Designed for professional users or businesses",
-  features: ["21,600 tokens/year", "All Pro features", "Enhanced processing speed", "Advanced customization options", "Priority processing queue", "20% yearly savings"],
+  features: ["21,600 tokens/year", "All Pro features", "2-5 GB max file size", "Enhanced processing speed", "Advanced customization options", "Priority processing queue", "20% yearly savings"],
   popular: false,
   productId: "1b319610-f033-4915-ba8a-71515342cc49",
   checkoutUrl: "https://buy.polar.sh/polar_cl_uRpszpsHKmwTyKLiFM1mphRQS3yKDURSGBbjY25SCSs"
@@ -82,7 +82,7 @@ const yearlyPlans = [{
   period: "",
   tokens: "Variable tokens",
   description: "Tailored for enterprises or high-volume users",
-  features: ["Flexible token allocation", "Personalized support", "Custom integrations", "Enterprise SLA", "Dedicated account manager", "Custom pricing negotiation"],
+  features: ["Flexible token allocation", "Unlimited file size", "Personalized support", "Custom integrations", "Enterprise SLA", "Dedicated account manager", "Custom pricing negotiation"],
   popular: false,
   productId: "91e74ded-3e16-4511-b299-f10b35778870",
   checkoutUrl: "https://buy.polar.sh/polar_cl_feKNJww7PMRcA7VKxkoBDjRNfkFML4GTihGaE1riZkm"
