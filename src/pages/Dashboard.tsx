@@ -5,18 +5,10 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-import { getFileSizeLimit } from "@/components/Pricing";
-import { TranscriptionSection } from "@/components/dashboard/TranscriptionSection";
-import { TranslationSection } from "@/components/dashboard/TranslationSection";
-import { VideoEditingProvider } from "@/contexts/VideoEditingContext";
-import { VideoPreview } from "@/components/dashboard/VideoPreview";
-import { SubtitleEditor } from "@/components/dashboard/SubtitleEditor";
-import { EditingControls } from "@/components/dashboard/EditingControls";
-import { StyleMatchingSection } from "@/components/dashboard/StyleMatchingSection";
+import { TranscribeUploadSection } from "@/components/dashboard/TranscribeUploadSection";
+import { TranslateUploadSection } from "@/components/dashboard/TranslateUploadSection";
+import { StyleMatchingUploadSection } from "@/components/dashboard/StyleMatchingUploadSection";
 import { 
-  Upload, 
-  FileVideo, 
-  Languages, 
   Zap, 
   Settings, 
   User,
@@ -24,39 +16,19 @@ import {
   Moon,
   Sun,
   Coins,
-  Download,
   Type,
   Mic,
-  X
+  Image
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, tokenBalance, signOut } = useAuth();
   const { toast } = useToast();
   const [isDark, setIsDark] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [currentVideo, setCurrentVideo] = useState<File | null>(null);
-  const [transcriptionResult, setTranscriptionResult] = useState<string>("");
-  const [pendingVideoJob, setPendingVideoJob] = useState<any>(null);
   const [uploadMode, setUploadMode] = useState<'transcribe' | 'translate' | 'style-match'>('transcribe');
-
-  // Transcription settings
-  const [primaryLanguage, setPrimaryLanguage] = useState("en");
-  const [detectLanguages, setDetectLanguages] = useState<string[]>([]);
-  const [autoDetect, setAutoDetect] = useState(true);
-
-  // Translation settings
-  const [sourceLanguage, setSourceLanguage] = useState("en");
-  const [targetLanguages, setTargetLanguages] = useState<string[]>([]);
-  const [translationPrompt, setTranslationPrompt] = useState("");
-  const [preserveFormatting, setPreserveFormatting] = useState(true);
-  const [maintainTiming, setMaintainTiming] = useState(true);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -78,326 +50,6 @@ const Dashboard = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(true);
-  };
-
-  const handleDragLeave = () => {
-    setDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      handleVideoUpload(files[0]);
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleVideoUpload(file);
-    }
-  };
-
-  const handleVideoUpload = async (file: File) => {
-    // Validate file type based on upload mode - only videos allowed for transcription/translation
-    if (!file.type.startsWith('video/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload a video file for processing.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to process videos.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const fileSizeMB = file.size / (1024 * 1024);
-
-    // Get user's subscription plan and file size limits
-    try {
-      // Use exact fractional calculation: 1 token = 10MB = $0.20
-      // For subscribers: allow 3 stacks (3 files) before charging tokens
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('subscription_plan, subscription_status, token_balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) throw profileError;
-
-      const isSubscriber = profile?.subscription_status === 'active';
-      const userPlan = profile?.subscription_plan || 'free';
-      const maxFileSizeMB = getFileSizeLimit(userPlan);
-      
-      if (fileSizeMB > maxFileSizeMB) {
-        toast({
-          title: "File too large",
-          description: `Maximum file size for your plan is ${maxFileSizeMB}MB. Current file is ${Math.round(fileSizeMB)}MB.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Set the current video for preview
-      setCurrentVideo(file);
-
-      // Create video job record (but don't process yet)
-      const { data: videoJob, error: jobError } = await supabase
-        .from('video_jobs')
-        .insert({
-          user_id: user.id,
-          original_filename: file.name,
-          file_size_mb: Math.round(fileSizeMB),
-          processing_type: uploadMode === 'transcribe' ? 'transcription' : (uploadMode === 'translate' ? 'translation' : 'style_matching'),
-          status: 'pending',
-          target_language: uploadMode === 'transcribe' ? (autoDetect ? 'auto' : primaryLanguage) : sourceLanguage
-        })
-        .select()
-        .single();
-
-      if (jobError) throw jobError;
-
-      setPendingVideoJob(videoJob);
-      
-      toast({
-        title: "Video uploaded successfully!",
-        description: `${file.name} is ready for AI processing. Click "Process with AI" to start.`,
-      });
-
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast({
-        title: "Upload failed",
-        description: error.message || "Failed to upload the file. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleProcessWithAI = async () => {
-    if (!currentVideo || !pendingVideoJob || !user) {
-      console.log('Missing requirements:', { currentVideo: !!currentVideo, pendingVideoJob: !!pendingVideoJob, user: !!user });
-      return;
-    }
-
-    setIsProcessing(true);
-    setUploadProgress(0);
-
-    try {
-      const fileSizeMB = currentVideo.size / (1024 * 1024);
-      console.log('Processing file:', { name: currentVideo.name, size: fileSizeMB + 'MB', mode: uploadMode });
-
-      // Check token requirements again before processing
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('subscription_plan, subscription_status, token_balance')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Profile fetch error:', profileError);
-        throw profileError;
-      }
-
-      const isSubscriber = profile?.subscription_status === 'active';
-      let tokensRequired = fileSizeMB / 10;
-      
-      if (isSubscriber) {
-        // Check recent uploads for subscribers (3 free stacks per billing period)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const { data: recentJobs, error: jobsError } = await supabase
-          .from('video_jobs')
-          .select('file_size_mb')
-          .eq('user_id', user.id)
-          .gte('created_at', thirtyDaysAgo.toISOString())
-          .eq('status', 'completed');
-        
-        if (!jobsError && recentJobs) {
-          const totalProcessedMB = recentJobs.reduce((sum, job) => sum + (job.file_size_mb || 0), 0);
-          const freeAllowanceMB = 3 * 10; // 3 stacks of 10MB each = 30MB free
-          
-          if (totalProcessedMB + fileSizeMB <= freeAllowanceMB) {
-            tokensRequired = 0; // Free for subscribers within their allowance
-          } else if (totalProcessedMB < freeAllowanceMB) {
-            // Partial charge - only for the amount exceeding free allowance
-            const exceededMB = (totalProcessedMB + fileSizeMB) - freeAllowanceMB;
-            tokensRequired = exceededMB / 10;
-          }
-        }
-      }
-
-      console.log('Token calculation:', { tokensRequired, tokenBalance, isSubscriber });
-
-      if (tokenBalance < tokensRequired) {
-        toast({
-          title: "Insufficient tokens",
-          description: `You need ${tokensRequired.toFixed(1)} tokens but only have ${tokenBalance}. Please purchase more tokens.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setUploadProgress(10);
-
-      // Convert file to base64 (with size limit check)
-      if (currentVideo.size > 100 * 1024 * 1024) { // 100MB limit for processing
-        throw new Error('File too large for processing. Maximum size is 100MB.');
-      }
-
-      const arrayBuffer = await currentVideo.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      
-      // Convert to base64 in chunks to prevent call stack overflow
-      let base64 = '';
-      const chunkSize = 32768; // 32KB chunks
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, i + chunkSize);
-        const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
-        base64 += btoa(chunkString);
-      }
-
-      setUploadProgress(30);
-
-      // Get authentication token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Authentication failed');
-
-      console.log('Starting AI processing for mode:', uploadMode);
-      let processingData;
-      
-      if (uploadMode === 'transcribe') {
-        // Call transcription function
-        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
-          body: {
-            videoData: base64,
-            videoSize: currentVideo.size,
-            videoJobId: pendingVideoJob.id,
-            primaryLanguage: autoDetect ? null : primaryLanguage,
-            detectLanguages: autoDetect ? [] : detectLanguages,
-            autoDetect: autoDetect,
-            uploadMode: uploadMode
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-        
-        if (error) {
-          console.error('Transcription error:', error);
-          throw error;
-        }
-        processingData = data;
-      } else if (uploadMode === 'translate') {
-        // First transcribe, then translate
-        const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('generate-subtitles', {
-          body: {
-            videoData: base64,
-            videoSize: currentVideo.size,
-            videoJobId: pendingVideoJob.id,
-            primaryLanguage: sourceLanguage,
-            detectLanguages: [],
-            autoDetect: false,
-            uploadMode: 'transcribe'
-          },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-        
-        if (transcribeError) {
-          console.error('Transcription error:', transcribeError);
-          throw transcribeError;
-        }
-        
-        // Then translate to target languages
-        if (targetLanguages.length > 0) {
-          const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-subtitles', {
-            body: {
-              videoJobId: pendingVideoJob.id,
-              sourceLanguage: sourceLanguage,
-              targetLanguages: targetLanguages,
-              preserveFormatting: preserveFormatting,
-              maintainTiming: maintainTiming
-            },
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-          
-          if (translateError) {
-            console.error('Translation error:', translateError);
-            throw translateError;
-          }
-          processingData = { ...transcribeData, ...translateData };
-        } else {
-          processingData = transcribeData;
-        }
-      }
-
-      setUploadProgress(100);
-
-      setTranscriptionResult(processingData?.transcription || "Processing completed successfully!");
-      setPendingVideoJob(null); // Clear pending job
-      
-      console.log('Processing completed successfully');
-      toast({
-        title: "AI Processing complete!",
-        description: `Successfully processed ${currentVideo.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
-      });
-
-    } catch (error: any) {
-      console.error('Processing error details:', error);
-      
-      let errorMessage = "Failed to process the file. Please try again.";
-      if (error.message?.includes('call stack')) {
-        errorMessage = "File too large for processing. Please try a smaller file.";
-      } else if (error.message?.includes('token')) {
-        errorMessage = error.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
-      toast({
-        title: "Processing failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-      setTimeout(() => {
-        setUploadProgress(0);
-      }, 2000);
-    }
-  };
-
-  const downloadSubtitles = () => {
-    if (!transcriptionResult) return;
-    
-    const blob = new Blob([transcriptionResult], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'subtitles.srt';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -466,20 +118,21 @@ const Dashboard = () => {
                       if (!session?.access_token) throw new Error('Not authenticated');
                       
                       const { data, error } = await supabase.functions.invoke('polar-customer-portal', {
-                        headers: { Authorization: `Bearer ${session.access_token}` }
+                        headers: {
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
                       });
                       
                       if (error) throw error;
+                      
                       if (data?.url) {
                         window.open(data.url, '_blank');
-                      } else {
-                        throw new Error('No portal URL returned');
                       }
                     } catch (error: any) {
                       console.error('Billing portal error:', error);
                       toast({
-                        title: "Billing portal error",
-                        description: error.message || "Unable to open billing portal. Please try again.",
+                        title: "Error",
+                        description: "Could not open billing portal. Please try again.",
                         variant: "destructive",
                       });
                     }
@@ -488,9 +141,9 @@ const Dashboard = () => {
                     Billing
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
-                    Log out
+                    Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -500,352 +153,45 @@ const Dashboard = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6 md:space-y-8">
-        {/* Header */}
-              <div className="text-center space-y-3 md:space-y-4 pt-4">
-          <h1 className="font-fredoka text-2xl md:text-4xl font-bold text-foreground">AI Voice Transcription</h1>
-          <p className="font-fredoka text-lg md:text-xl text-foreground max-w-2xl mx-auto px-4">
-            Transform your audio and video files into professional subtitles with AI-powered transcription
-          </p>
-        </div>
-
+      <div className="container mx-auto p-4 md:p-6 space-y-6 max-w-6xl">
         {/* Processing Mode Selection */}
         <GlassCard className="p-4 md:p-6">
-          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Choose Processing Mode</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
+          <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Select Processing Mode</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
               variant={uploadMode === 'transcribe' ? 'default' : 'outline'}
               onClick={() => setUploadMode('transcribe')}
-              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
+              className="h-auto p-4 flex flex-col items-center gap-2 min-h-[80px] touch-manipulation font-fredoka"
             >
-              <Mic className="h-6 md:h-8 w-6 md:w-8" />
-              <span className="font-medium text-sm md:text-base font-fredoka">Transcribe Audio</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Extract speech from video and generate subtitles</span>
+              <Mic className="h-6 w-6" />
+              <span className="text-sm font-medium">Transcribe</span>
+              <span className="text-xs text-muted-foreground">Convert speech to text</span>
             </Button>
             <Button
               variant={uploadMode === 'translate' ? 'default' : 'outline'}
               onClick={() => setUploadMode('translate')}
-              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
+              className="h-auto p-4 flex flex-col items-center gap-2 min-h-[80px] touch-manipulation font-fredoka"
             >
-              <Languages className="h-6 md:h-8 w-6 md:w-8" />
-              <span className="font-medium text-sm md:text-base font-fredoka">Transcribe & Translate</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">Generate subtitles in multiple languages</span>
+              <Type className="h-6 w-6" />
+              <span className="text-sm font-medium">Translate</span>
+              <span className="text-xs text-muted-foreground">Transcribe & translate</span>
             </Button>
             <Button
               variant={uploadMode === 'style-match' ? 'default' : 'outline'}
               onClick={() => setUploadMode('style-match')}
-              className="p-4 md:p-6 h-auto flex-col space-y-2 min-h-[120px] md:min-h-[140px] touch-manipulation"
-              disabled={!currentVideo}
+              className="h-auto p-4 flex flex-col items-center gap-2 min-h-[80px] touch-manipulation font-fredoka"
             >
-              <Zap className="h-6 md:h-8 w-6 md:w-8" />
-              <span className="font-medium text-sm md:text-base font-fredoka">Match Subtitle Style</span>
-              <span className="text-xs md:text-sm opacity-80 text-center leading-tight font-fredoka">
-                {!currentVideo ? 'Upload a video first to enable' : 'Analyze and copy styling from reference images'}
-              </span>
+              <Image className="h-6 w-6" />
+              <span className="text-sm font-medium">Style Match</span>
+              <span className="text-xs text-muted-foreground">Match subtitle style</span>
             </Button>
           </div>
         </GlassCard>
 
-        {/* AI Processing Settings */}
-        <TranscriptionSection
-          isActive={uploadMode === 'transcribe'}
-          primaryLanguage={primaryLanguage}
-          onPrimaryLanguageChange={setPrimaryLanguage}
-          detectLanguages={detectLanguages}
-          onDetectLanguagesChange={setDetectLanguages}
-          autoDetect={autoDetect}
-          onAutoDetectChange={setAutoDetect}
-        />
-
-        <TranslationSection
-          isActive={uploadMode === 'translate'}
-          sourceLanguage={sourceLanguage}
-          onSourceLanguageChange={setSourceLanguage}
-          targetLanguages={targetLanguages}
-          onTargetLanguagesChange={setTargetLanguages}
-          preserveFormatting={preserveFormatting}
-          onPreserveFormattingChange={setPreserveFormatting}
-          maintainTiming={maintainTiming}
-          onMaintainTimingChange={setMaintainTiming}
-        />
-
-        {/* Upload Section */}
-        {(uploadMode === 'transcribe' || uploadMode === 'translate') && (
-          <GlassCard className="p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <div className="text-center sm:text-left">
-                <h3 className="font-fredoka text-lg font-semibold text-foreground mb-1">
-                  {currentVideo ? 'Ready to Process' : 'Upload Video'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {currentVideo 
-                    ? `${currentVideo.name} uploaded. Click "Process with AI" to start ${uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}.`
-                    : `Upload your video to start ${uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}`
-                  }
-                </p>
-              </div>
-              
-              <div className="flex gap-2">
-                {!currentVideo ? (
-                  <div
-                    className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
-                      dragOver
-                        ? 'border-primary bg-primary/5'
-                        : 'border-muted-foreground/25 hover:border-primary/50'
-                    }`}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onClick={() => document.getElementById('video-upload')?.click()}
-                  >
-                    <input
-                      id="video-upload"
-                      type="file"
-                      accept="video/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    
-                    <div className="space-y-2">
-                      <Upload className="w-6 h-6 text-muted-foreground mx-auto" />
-                      <p className="text-sm font-medium text-foreground">
-                        Drop video here or <span className="text-primary">browse</span>
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleProcessWithAI}
-                      disabled={isProcessing || !pendingVideoJob}
-                      className="min-h-[44px] font-fredoka"
-                      size="lg"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                          Processing... {uploadProgress}%
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-4 h-4 mr-2" />
-                          Process with AI
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button
-                      onClick={() => {
-                        setCurrentVideo(null);
-                        setPendingVideoJob(null);
-                        setTranscriptionResult("");
-                      }}
-                      variant="outline"
-                      className="min-h-[44px] font-fredoka"
-                      disabled={isProcessing}
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Remove
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </GlassCard>
-        )}
-
-        {/* Style Matching Section */}
-        {uploadMode === 'style-match' && currentVideo && (
-          <StyleMatchingSection
-            hasVideo={!!currentVideo}
-            onStyleMatch={(matchedStyle) => {
-              console.log('Style matched:', matchedStyle);
-              toast({
-                title: "Style Analysis Complete",
-                description: `Detected subtitle styling with ${Math.round(matchedStyle.confidence * 100)}% confidence`,
-              });
-            }}
-          />
-        )}
-
-        {/* Upload Area - Only shown for video upload modes */}
-        {uploadMode !== 'style-match' && (
-          <GlassCard 
-            className={`p-6 md:p-8 border-2 border-dashed transition-all duration-200 ${
-              dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="text-center space-y-4">
-              {!currentVideo ? (
-                <>
-                  <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                    {uploadMode === 'transcribe' ? (
-                      <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-                    ) : (
-                      <Languages className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-fredoka text-lg md:text-xl font-semibold text-foreground">
-                      Upload Video for Processing
-                    </h3>
-                    <p className="text-muted-foreground mt-2 text-sm md:text-base px-4 font-fredoka">
-                      Drag and drop your video here, or tap to browse
-                    </p>
-                  </div>
-                  <div>
-                    <Input
-                      type="file"
-                      accept="video/*"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <Button asChild className="font-medium min-h-[48px] px-6 md:px-8 touch-manipulation font-fredoka">
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <Upload className="mr-2 h-4 w-4" />
-                        Choose Video File
-                      </label>
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground px-4 leading-relaxed font-fredoka">
-                    Supported: MP4, MOV, AVI (video only)<br className="md:hidden" />
-                    <span className="md:ml-2">
-                      Cost: 1 token per 10MB
-                      {uploadMode === 'translate' && ' + 15 tokens per translation language'}
-                    </span>
-                  </p>
-                </>
-              ) : (
-                <div className="space-y-4">
-                  <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                    <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4 text-foreground">{currentVideo.name}</h3>
-                    <p className="text-muted-foreground text-sm md:text-base font-fredoka">
-                      {Math.round(currentVideo.size / (1024 * 1024))}MB • 
-                      Cost: {((currentVideo.size / (1024 * 1024)) / 10).toFixed(1)} tokens
-                      {uploadMode === 'translate' && targetLanguages.length > 0 && (
-                        <span> + {targetLanguages.length * 15} translation tokens</span>
-                      )}
-                    </p>
-                  </div>
-                  
-                  {isProcessing && (
-                  <div className="flex flex-col items-center space-y-3 px-4">
-                      <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                      <p className="text-sm text-muted-foreground font-fredoka">
-                        Processing video with AI...
-                      </p>
-                    </div>
-                  )}
-                  
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setCurrentVideo(null);
-                      setTranscriptionResult("");
-                      setUploadProgress(0);
-                    }}
-                    disabled={isProcessing}
-                    className="min-h-[44px] touch-manipulation font-fredoka"
-                  >
-                    Upload Different File
-                  </Button>
-                </div>
-              )}
-            </div>
-          </GlassCard>
-        )}
-
-        {/* Video Editing Workspace */}
-        {(currentVideo || transcriptionResult) && (
-          <VideoEditingProvider>
-            <GlassCard className="p-4 md:p-6">
-              <h2 className="font-fredoka text-lg md:text-xl font-semibold mb-4 text-foreground">Video Editor</h2>
-              
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                {/* Main editing area - spans 3 columns */}
-                <div className="xl:col-span-3 space-y-6">
-                  {/* Video Preview */}
-                  <VideoPreview 
-                    videoFile={currentVideo}
-                    subtitles={transcriptionResult ? [
-                      { id: '1', startTime: 0, endTime: 2, text: 'Sample subtitle from transcription' },
-                      { id: '2', startTime: 3, endTime: 5, text: 'Generated from your video content' },
-                    ] : []}
-                    onDownloadVideo={() => {
-                      toast({
-                        title: "Export Started",
-                        description: "Your video is being processed with the current settings...",
-                      });
-                    }}
-                    onDownloadSRT={() => {
-                      if (transcriptionResult) {
-                        const blob = new Blob([transcriptionResult], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'subtitles.srt';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                      }
-                    }}
-                  />
-                  
-                  {/* Subtitle Editor */}
-                  <SubtitleEditor
-                    subtitles={transcriptionResult ? [
-                      { id: '1', startTime: 0, endTime: 2, text: 'Welcome to the video editing workspace' },
-                      { id: '2', startTime: 3, endTime: 5, text: 'You can edit subtitles here in real-time' },
-                      { id: '3', startTime: 6, endTime: 8, text: 'All changes are reflected in the preview above' },
-                    ] : []}
-                    onSubtitleUpdate={(subtitles) => {
-                      console.log('Subtitles updated:', subtitles);
-                    }}
-                    onSeekToTime={(time) => {
-                      console.log('Seeking to time:', time);
-                    }}
-                    currentTime={0}
-                  />
-                </div>
-                
-                {/* Editing Controls Sidebar */}
-                <div className="xl:col-span-1">
-                  <EditingControls />
-                </div>
-              </div>
-
-              {/* Processing Status & Original Download */}
-              {currentVideo && (
-                <div className="mt-6 p-4 bg-muted/30 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">File Information</h4>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <div>File: {currentVideo.name}</div>
-                        <div>Size: {(currentVideo.size / (1024 * 1024)).toFixed(2)} MB</div>
-                        <div>Type: {currentVideo.type}</div>
-                      </div>
-                    </div>
-                    {transcriptionResult && (
-                      <Button onClick={downloadSubtitles} size="sm" variant="outline" className="font-fredoka">
-                        <Download className="mr-2 h-4 w-4" />
-                        Original SRT
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </GlassCard>
-          </VideoEditingProvider>
-        )}
+        {/* Mode-specific Upload Sections */}
+        {uploadMode === 'transcribe' && <TranscribeUploadSection />}
+        {uploadMode === 'translate' && <TranslateUploadSection />}
+        {uploadMode === 'style-match' && <StyleMatchingUploadSection />}
 
         {/* Token Status */}
         <GlassCard className="p-4 md:p-6">
