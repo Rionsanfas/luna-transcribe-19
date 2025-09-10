@@ -26,7 +26,8 @@ import {
   Coins,
   Download,
   Type,
-  Mic
+  Mic,
+  X
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -42,6 +43,7 @@ const Dashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<File | null>(null);
   const [transcriptionResult, setTranscriptionResult] = useState<string>("");
+  const [pendingVideoJob, setPendingVideoJob] = useState<any>(null);
   const [uploadMode, setUploadMode] = useState<'transcribe' | 'translate' | 'style-match'>('transcribe');
 
   // Transcription settings
@@ -150,7 +152,61 @@ const Dashboard = () => {
         return;
       }
 
-      // Check how many files user has processed recently (for subscriber free allowance)
+      // Set the current video for preview
+      setCurrentVideo(file);
+
+      // Create video job record (but don't process yet)
+      const { data: videoJob, error: jobError } = await supabase
+        .from('video_jobs')
+        .insert({
+          user_id: user.id,
+          original_filename: file.name,
+          file_size_mb: Math.round(fileSizeMB),
+          processing_type: uploadMode === 'transcribe' ? 'transcription' : (uploadMode === 'translate' ? 'translation' : 'style_matching'),
+          status: 'pending',
+          target_language: uploadMode === 'transcribe' ? (autoDetect ? 'auto' : primaryLanguage) : sourceLanguage
+        })
+        .select()
+        .single();
+
+      if (jobError) throw jobError;
+
+      setPendingVideoJob(videoJob);
+      
+      toast({
+        title: "Video uploaded successfully!",
+        description: `${file.name} is ready for AI processing. Click "Process with AI" to start.`,
+      });
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload the file. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleProcessWithAI = async () => {
+    if (!currentVideo || !pendingVideoJob || !user) return;
+
+    setIsProcessing(true);
+    setUploadProgress(0);
+
+    try {
+      const fileSizeMB = currentVideo.size / (1024 * 1024);
+
+      // Check token requirements again before processing
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_plan, subscription_status, token_balance')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      const isSubscriber = profile?.subscription_status === 'active';
       let tokensRequired = fileSizeMB / 10;
       
       if (isSubscriber) {
@@ -188,30 +244,10 @@ const Dashboard = () => {
         return;
       }
 
-      setCurrentVideo(file);
-      setIsProcessing(true);
-      setUploadProgress(0);
-
-      // Create video job record
-      const { data: videoJob, error: jobError } = await supabase
-        .from('video_jobs')
-        .insert({
-          user_id: user.id,
-          original_filename: file.name,
-          file_size_mb: Math.round(fileSizeMB),
-          processing_type: uploadMode === 'transcribe' ? 'transcription' : (uploadMode === 'translate' ? 'translation' : 'style_matching'),
-          status: 'pending',
-          target_language: uploadMode === 'transcribe' ? (autoDetect ? 'auto' : primaryLanguage) : sourceLanguage
-        })
-        .select()
-        .single();
-
-      if (jobError) throw jobError;
-
       setUploadProgress(10);
 
       // Convert file to base64
-      const arrayBuffer = await file.arrayBuffer();
+      const arrayBuffer = await currentVideo.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
       setUploadProgress(30);
@@ -227,8 +263,8 @@ const Dashboard = () => {
         const { data, error } = await supabase.functions.invoke('generate-subtitles', {
           body: {
             videoData: base64,
-            videoSize: file.size,
-            videoJobId: videoJob.id,
+            videoSize: currentVideo.size,
+            videoJobId: pendingVideoJob.id,
             primaryLanguage: autoDetect ? null : primaryLanguage,
             detectLanguages: autoDetect ? [] : detectLanguages,
             autoDetect: autoDetect,
@@ -246,8 +282,8 @@ const Dashboard = () => {
         const { data: transcribeData, error: transcribeError } = await supabase.functions.invoke('generate-subtitles', {
           body: {
             videoData: base64,
-            videoSize: file.size,
-            videoJobId: videoJob.id,
+            videoSize: currentVideo.size,
+            videoJobId: pendingVideoJob.id,
             primaryLanguage: sourceLanguage,
             detectLanguages: [],
             autoDetect: false,
@@ -264,7 +300,7 @@ const Dashboard = () => {
         if (targetLanguages.length > 0) {
           const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-subtitles', {
             body: {
-              videoJobId: videoJob.id,
+              videoJobId: pendingVideoJob.id,
               sourceLanguage: sourceLanguage,
               targetLanguages: targetLanguages,
               preserveFormatting: preserveFormatting,
@@ -285,16 +321,17 @@ const Dashboard = () => {
       setUploadProgress(100);
 
       setTranscriptionResult(processingData?.transcription || "Processing completed successfully!");
+      setPendingVideoJob(null); // Clear pending job
       
       toast({
-        title: "Processing complete!",
-        description: `Successfully processed ${file.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
+        title: "AI Processing complete!",
+        description: `Successfully processed ${currentVideo.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
       });
 
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('Processing error:', error);
       toast({
-        title: "Upload failed",
+        title: "Processing failed",
         description: error.message || "Failed to process the file. Please try again.",
         variant: "destructive",
       });
@@ -489,49 +526,84 @@ const Dashboard = () => {
           onMaintainTimingChange={setMaintainTiming}
         />
 
-        {/* Process Button */}
+        {/* Upload Section */}
         {(uploadMode === 'transcribe' || uploadMode === 'translate') && (
           <GlassCard className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
               <div className="text-center sm:text-left">
                 <h3 className="font-fredoka text-lg font-semibold text-foreground mb-1">
-                  Ready to Process
+                  {currentVideo ? 'Ready to Process' : 'Upload Video'}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Upload your video to start {uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}
+                  {currentVideo 
+                    ? `${currentVideo.name} uploaded. Click "Process with AI" to start ${uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}.`
+                    : `Upload your video to start ${uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}`
+                  }
                 </p>
               </div>
               
-              <div
-                className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
-                  dragOver
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted-foreground/25 hover:border-primary/50'
-                }`}
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onClick={() => document.getElementById('video-upload')?.click()}
-              >
-                <input
-                  id="video-upload"
-                  type="file"
-                  accept="video/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                
-                {isProcessing ? (
-                  <div className="space-y-2">
-                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-xs text-muted-foreground">Processing... {uploadProgress}%</p>
+              <div className="flex gap-2">
+                {!currentVideo ? (
+                  <div
+                    className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                      dragOver
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted-foreground/25 hover:border-primary/50'
+                    }`}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onClick={() => document.getElementById('video-upload')?.click()}
+                  >
+                    <input
+                      id="video-upload"
+                      type="file"
+                      accept="video/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    
+                    <div className="space-y-2">
+                      <Upload className="w-6 h-6 text-muted-foreground mx-auto" />
+                      <p className="text-sm font-medium text-foreground">
+                        Drop video here or <span className="text-primary">browse</span>
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Upload className="w-6 h-6 text-muted-foreground mx-auto" />
-                    <p className="text-sm font-medium text-foreground">
-                      Drop video here or <span className="text-primary">browse</span>
-                    </p>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleProcessWithAI}
+                      disabled={isProcessing || !pendingVideoJob}
+                      className="min-h-[44px] font-fredoka"
+                      size="lg"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Processing... {uploadProgress}%
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Process with AI
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      onClick={() => {
+                        setCurrentVideo(null);
+                        setPendingVideoJob(null);
+                        setTranscriptionResult("");
+                      }}
+                      variant="outline"
+                      className="min-h-[44px] font-fredoka"
+                      disabled={isProcessing}
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Remove
+                    </Button>
                   </div>
                 )}
               </div>
