@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Edge Function</title>
+</head>
+<body>
+    <h1>Edge Function Test</h1>
+    <button onclick="testEdgeFunction()">Test Generate Subtitles Function (Diagnostic)</button>
+    <div id="result"></div>
+
+    <script>
+        async function testEdgeFunction() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+
+            try {
+                // Create a small test video data (fake base64)
+                const testBase64 = btoa("fake video data for testing purposes");
+                
+                console.log('Testing with payload:', {
+                    videoData: testBase64,
+                    videoSize: 1000,
+                    videoJobId: 'test-job-id'
+                });
+                
+                const response = await fetch('https://fbzsjvifhhaumzjedvmj.supabase.co/functions/v1/test-generate-subtitles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        videoData: testBase64,
+                        videoSize: 1000,
+                        videoJobId: 'test-job-id',
+                        primaryLanguage: 'en',
+                        detectLanguages: [],
+                        autoDetect: true,
+                        uploadMode: 'transcribe'
+                    })
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                const responseText = await response.text();
+                console.log('Raw response:', responseText);
+
+                try {
+                    const data = JSON.parse(responseText);
+                    resultDiv.innerHTML = `
+                        <h3>Response Status: ${response.status}</h3>
+                        <h4>Success: ${response.ok ? 'YES' : 'NO'}</h4>
+                        <h4>Response Data:</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } catch (parseError) {
+                    resultDiv.innerHTML = `
+                        <h3>Response Status: ${response.status}</h3>
+                        <h4>Raw Response (not JSON):</h4>
+                        <pre>${responseText}</pre>
+                        <h4>Parse Error:</h4>
+                        <pre>${parseError.message}</pre>
+                    `;
+                }
+
+            } catch (error) {
+                console.error('Test error:', error);
+                resultDiv.innerHTML = `
+                    <h3>Test Failed</h3>
+                    <pre>${error.message}</pre>
+                    <h4>Full Error:</h4>
+                    <pre>${JSON.stringify(error, null, 2)}</pre>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

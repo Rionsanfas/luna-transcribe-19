@@ -482,12 +482,24 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Subtitle generation error:', error);
+    console.error('=== EDGE FUNCTION CRITICAL ERROR ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error toString:', error.toString());
+    
+    // Try to get more context about the request
+    let videoJobId;
+    try {
+      const body = await req.clone().json();
+      videoJobId = body.videoJobId;
+    } catch (bodyError) {
+      console.error('Could not parse request body in error handler:', bodyError);
+    }
     
     // Try to update job status to failed if we have the videoJobId
-    try {
-      const { videoJobId } = await req.json().catch(() => ({}));
-      if (videoJobId) {
+    if (videoJobId) {
+      try {
         const serviceSupabase = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -501,16 +513,21 @@ serve(async (req) => {
             progress_percentage: 0
           })
           .eq('id', videoJobId);
+      } catch (updateError) {
+        console.error('Failed to update job status in error handler:', updateError);
       }
-    } catch (updateError) {
-      console.error('Failed to update job status:', updateError);
     }
     
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
-        message: 'An unexpected error occurred. Please try again later.',
-        details: error.message
+        message: error.message || 'An unexpected error occurred',
+        details: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        },
+        timestamp: new Date().toISOString()
       }),
       { 
         status: 500,
