@@ -92,3 +92,6 @@ verify_jwt = true
 
 [functions.test-generate-subtitles]
 verify_jwt = false
+
+[functions.test-minimal]
+verify_jwt = false

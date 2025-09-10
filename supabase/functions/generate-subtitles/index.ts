@@ -48,11 +48,24 @@ serve(async (req) => {
 
     // Validate required parameters
     if (!videoData || !videoSize || !videoJobId) {
-      console.error('Missing required parameters');
+      console.error('Missing required parameters:', {
+        hasVideoData: !!videoData,
+        videoDataType: typeof videoData,
+        videoDataLength: videoData?.length,
+        hasVideoSize: !!videoSize,
+        videoSize,
+        hasVideoJobId: !!videoJobId,
+        videoJobId
+      });
       return new Response(
         JSON.stringify({ 
           error: 'Missing required parameters',
-          required: ['videoData', 'videoSize', 'videoJobId']
+          required: ['videoData', 'videoSize', 'videoJobId'],
+          received: {
+            hasVideoData: !!videoData,
+            hasVideoSize: !!videoSize,
+            hasVideoJobId: !!videoJobId
+          }
         }),
         { 
           status: 400,
