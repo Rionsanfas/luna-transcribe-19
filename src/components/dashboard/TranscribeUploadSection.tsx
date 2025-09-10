@@ -261,11 +261,26 @@ export const TranscribeUploadSection = () => {
       
       if (error) {
         console.error('=== EDGE FUNCTION ERROR ===');
-        console.error('Error object:', error);
-        console.error('Error name:', error.name);
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-        throw error;
+        console.error('Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          context: error.context
+        });
+        
+        // Try to extract better error message from the data response if available
+        let errorMessage = error.message;
+        let errorDetails = '';
+        
+        if (data?.error) {
+          errorMessage = data.error;
+          errorDetails = data.details || data.message || '';
+        } else if (error.message?.includes('non-2xx status code')) {
+          errorMessage = 'Processing failed on server';
+          errorDetails = 'The edge function returned an error. Check the function logs for details.';
+        }
+        
+        throw new Error(`${errorMessage}${errorDetails ? ': ' + errorDetails : ''}`);
       }
 
       setUploadProgress(100);
