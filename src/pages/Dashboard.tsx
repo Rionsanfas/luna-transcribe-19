@@ -189,13 +189,17 @@ const Dashboard = () => {
   };
 
   const handleProcessWithAI = async () => {
-    if (!currentVideo || !pendingVideoJob || !user) return;
+    if (!currentVideo || !pendingVideoJob || !user) {
+      console.log('Missing requirements:', { currentVideo: !!currentVideo, pendingVideoJob: !!pendingVideoJob, user: !!user });
+      return;
+    }
 
     setIsProcessing(true);
     setUploadProgress(0);
 
     try {
       const fileSizeMB = currentVideo.size / (1024 * 1024);
+      console.log('Processing file:', { name: currentVideo.name, size: fileSizeMB + 'MB', mode: uploadMode });
 
       // Check token requirements again before processing
       const { data: profile, error: profileError } = await supabase
@@ -204,7 +208,10 @@ const Dashboard = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+        throw profileError;
+      }
 
       const isSubscriber = profile?.subscription_status === 'active';
       let tokensRequired = fileSizeMB / 10;
@@ -235,6 +242,8 @@ const Dashboard = () => {
         }
       }
 
+      console.log('Token calculation:', { tokensRequired, tokenBalance, isSubscriber });
+
       if (tokenBalance < tokensRequired) {
         toast({
           title: "Insufficient tokens",
@@ -246,9 +255,22 @@ const Dashboard = () => {
 
       setUploadProgress(10);
 
-      // Convert file to base64
+      // Convert file to base64 (with size limit check)
+      if (currentVideo.size > 100 * 1024 * 1024) { // 100MB limit for processing
+        throw new Error('File too large for processing. Maximum size is 100MB.');
+      }
+
       const arrayBuffer = await currentVideo.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // Convert to base64 in chunks to prevent call stack overflow
+      let base64 = '';
+      const chunkSize = 32768; // 32KB chunks
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, i + chunkSize);
+        const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
+        base64 += btoa(chunkString);
+      }
 
       setUploadProgress(30);
 
@@ -256,6 +278,7 @@ const Dashboard = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Authentication failed');
 
+      console.log('Starting AI processing for mode:', uploadMode);
       let processingData;
       
       if (uploadMode === 'transcribe') {
@@ -275,7 +298,10 @@ const Dashboard = () => {
           },
         });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Transcription error:', error);
+          throw error;
+        }
         processingData = data;
       } else if (uploadMode === 'translate') {
         // First transcribe, then translate
@@ -294,7 +320,10 @@ const Dashboard = () => {
           },
         });
         
-        if (transcribeError) throw transcribeError;
+        if (transcribeError) {
+          console.error('Transcription error:', transcribeError);
+          throw transcribeError;
+        }
         
         // Then translate to target languages
         if (targetLanguages.length > 0) {
@@ -311,7 +340,10 @@ const Dashboard = () => {
             },
           });
           
-          if (translateError) throw translateError;
+          if (translateError) {
+            console.error('Translation error:', translateError);
+            throw translateError;
+          }
           processingData = { ...transcribeData, ...translateData };
         } else {
           processingData = transcribeData;
@@ -323,16 +355,27 @@ const Dashboard = () => {
       setTranscriptionResult(processingData?.transcription || "Processing completed successfully!");
       setPendingVideoJob(null); // Clear pending job
       
+      console.log('Processing completed successfully');
       toast({
         title: "AI Processing complete!",
         description: `Successfully processed ${currentVideo.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
       });
 
     } catch (error: any) {
-      console.error('Processing error:', error);
+      console.error('Processing error details:', error);
+      
+      let errorMessage = "Failed to process the file. Please try again.";
+      if (error.message?.includes('call stack')) {
+        errorMessage = "File too large for processing. Please try a smaller file.";
+      } else if (error.message?.includes('token')) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         title: "Processing failed",
-        description: error.message || "Failed to process the file. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
