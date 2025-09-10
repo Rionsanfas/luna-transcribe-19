@@ -96,7 +96,7 @@ serve(async (req) => {
       })
       .eq('id', videoJobId);
 
-    // Convert base64 to binary - simplified approach
+    // Convert base64 to binary using chunked processing for large files
     console.log('Converting base64 to binary...');
     let binaryVideo;
     
@@ -107,14 +107,49 @@ serve(async (req) => {
         cleanBase64 = videoData.split('base64,')[1];
       }
       
-      // Simple base64 decode
-      const binaryString = atob(cleanBase64);
-      binaryVideo = new Uint8Array(binaryString.length);
+      console.log('Processing base64 in chunks, length:', cleanBase64.length);
       
-      for (let i = 0; i < binaryString.length; i++) {
-        binaryVideo[i] = binaryString.charCodeAt(i);
+      // Process base64 in chunks to prevent memory issues
+      function processBase64Chunks(base64String: string, chunkSize = 32768) {
+        const chunks: Uint8Array[] = [];
+        let position = 0;
+        
+        // Ensure chunk size is multiple of 4 for valid base64 padding
+        const validChunkSize = Math.floor(chunkSize / 4) * 4;
+        
+        while (position < base64String.length) {
+          const chunk = base64String.slice(position, Math.min(position + validChunkSize, base64String.length));
+          
+          try {
+            const binaryChunk = atob(chunk);
+            const bytes = new Uint8Array(binaryChunk.length);
+            
+            for (let i = 0; i < binaryChunk.length; i++) {
+              bytes[i] = binaryChunk.charCodeAt(i);
+            }
+            
+            chunks.push(bytes);
+          } catch (chunkError) {
+            console.error('Error processing chunk at position', position, ':', chunkError.message);
+            throw new Error(`Base64 decode failed at position ${position}: ${chunkError.message}`);
+          }
+          
+          position += validChunkSize;
+        }
+
+        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        const result = new Uint8Array(totalLength);
+        let offset = 0;
+
+        for (const chunk of chunks) {
+          result.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        return result;
       }
-      
+
+      binaryVideo = processBase64Chunks(cleanBase64);
       console.log('Base64 conversion successful, binary size:', binaryVideo.length);
       
     } catch (decodeError) {
