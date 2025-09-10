@@ -193,8 +193,52 @@ serve(async (req) => {
       })
       .eq('id', videoJobId);
 
-    // Convert base64 to binary
-    const binaryVideo = Uint8Array.from(atob(videoData), c => c.charCodeAt(0));
+    // Convert base64 to binary using safe decoding
+    console.log('Converting base64 to binary...');
+    let binaryVideo;
+    try {
+      // First, decode the entire base64 string (we can't chunk base64 decoding)
+      console.log('Decoding base64 string, length:', videoData.length);
+      const binaryString = atob(videoData);
+      
+      // Then convert to Uint8Array in chunks to prevent memory issues
+      console.log('Converting to Uint8Array, binary length:', binaryString.length);
+      const chunkSize = 1024 * 1024; // 1MB chunks for memory efficiency
+      binaryVideo = new Uint8Array(binaryString.length);
+      
+      for (let i = 0; i < binaryString.length; i += chunkSize) {
+        const end = Math.min(i + chunkSize, binaryString.length);
+        for (let j = i; j < end; j++) {
+          binaryVideo[j] = binaryString.charCodeAt(j);
+        }
+      }
+      
+      console.log('Successfully converted base64 to binary, size:', binaryVideo.length);
+    } catch (decodeError) {
+      console.error('Base64 decode error:', decodeError);
+      
+      // Update job status to failed
+      await serviceSupabase
+        .from('video_jobs')
+        .update({ 
+          status: 'failed',
+          error_message: 'Invalid video data format',
+          progress_percentage: 0
+        })
+        .eq('id', videoJobId);
+      
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid video data',
+          message: 'The uploaded video data is corrupted or invalid. Please try uploading again.',
+          details: decodeError.message
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Create form data for OpenAI Whisper
     const formData = new FormData();
