@@ -16,8 +16,8 @@
             resultDiv.innerHTML = '<p>Testing...</p>';
 
             try {
-                // Create a small test video data (fake base64)
-                const testBase64 = btoa("fake video data for testing purposes");
+                // Create a realistic test video data (MP4 header base64)
+                const testBase64 = "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAB4NbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAJgEAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAKRzdHNkAAAAAAAAAAEAAACUbXA0YQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaGRscgAAAAAAAAAAdmlkZQAAAAAAAAAAAAAAAFZpZGVvSGFuZGxlcgAAAAA=";
                 
                 console.log('Testing with payload:', {
                     videoData: testBase64,
@@ -28,7 +28,8 @@
                 const response = await fetch('https://fbzsjvifhhaumzjedvmj.supabase.co/functions/v1/test-generate-subtitles', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZienNqdmlmaGhhdW16amVkdm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNTMwNDUsImV4cCI6MjA3MjYyOTA0NX0.rQgAu0UxgjEBsQvge65e08Or4VvpHafUKmPTke9FagU'
                     },
                     body: JSON.stringify({
                         videoData: testBase64,
