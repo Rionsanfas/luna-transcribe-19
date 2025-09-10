@@ -178,45 +178,93 @@ export const TranscribeUploadSection = () => {
         return;
       }
 
-      setUploadProgress(10);
+      console.log('=== FRONTEND PROCESSING START ===');
+      console.log('File details:', {
+        name: currentVideo.name,
+        size: currentVideo.size,
+        type: currentVideo.type,
+        lastModified: currentVideo.lastModified,
+        fileSizeMB: fileSizeMB
+      });
 
       if (currentVideo.size > 100 * 1024 * 1024) {
         throw new Error('File too large for processing. Maximum size is 100MB.');
       }
 
+      setUploadProgress(10);
+
+      console.log('Starting file conversion to base64...');
       const arrayBuffer = await currentVideo.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
+      console.log('ArrayBuffer created, size:', arrayBuffer.byteLength);
       
+      const uint8Array = new Uint8Array(arrayBuffer);
+      console.log('Uint8Array created, length:', uint8Array.length);
+      
+      // Convert to base64 more reliably
+      const chunkSize = 32768; // 32KB chunks
       let base64 = '';
-      const chunkSize = 32768;
+      
+      console.log('Converting to base64 in chunks of', chunkSize);
       for (let i = 0; i < uint8Array.length; i += chunkSize) {
         const chunk = uint8Array.subarray(i, i + chunkSize);
         const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
-        base64 += btoa(chunkString);
+        const chunkBase64 = btoa(chunkString);
+        base64 += chunkBase64;
+        
+        if (i % (chunkSize * 10) === 0) {
+          console.log(`Progress: ${Math.round((i / uint8Array.length) * 100)}%`);
+        }
       }
+      
+      console.log('Base64 conversion complete:', {
+        originalSize: uint8Array.length,
+        base64Length: base64.length,
+        base64Preview: base64.substring(0, 100) + '...',
+        base64Suffix: '...' + base64.substring(base64.length - 100)
+      });
 
       setUploadProgress(30);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Authentication failed');
 
+      console.log('=== SENDING REQUEST TO EDGE FUNCTION ===');
+      const requestPayload = {
+        videoData: base64,
+        videoSize: currentVideo.size,
+        videoJobId: pendingVideoJob.id,
+        primaryLanguage: autoDetect ? null : primaryLanguage,
+        detectLanguages: autoDetect ? [] : detectLanguages,
+        autoDetect: autoDetect,
+        uploadMode: 'transcribe'
+      };
+      
+      console.log('Request payload summary:', {
+        hasVideoData: !!requestPayload.videoData,
+        videoDataLength: requestPayload.videoData?.length,
+        videoSize: requestPayload.videoSize,
+        videoJobId: requestPayload.videoJobId,
+        primaryLanguage: requestPayload.primaryLanguage,
+        detectLanguagesCount: requestPayload.detectLanguages?.length,
+        autoDetect: requestPayload.autoDetect,
+        uploadMode: requestPayload.uploadMode
+      });
+
       const { data, error } = await supabase.functions.invoke('generate-subtitles', {
-        body: {
-          videoData: base64,
-          videoSize: currentVideo.size,
-          videoJobId: pendingVideoJob.id,
-          primaryLanguage: autoDetect ? null : primaryLanguage,
-          detectLanguages: autoDetect ? [] : detectLanguages,
-          autoDetect: autoDetect,
-          uploadMode: 'transcribe'
-        },
+        body: requestPayload,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
       
+      console.log('Edge function response:', { data, error });
+      
       if (error) {
-        console.error('Transcription error:', error);
+        console.error('=== EDGE FUNCTION ERROR ===');
+        console.error('Error object:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
         throw error;
       }
 

@@ -45,6 +45,8 @@ serve(async (req) => {
       );
     }
 
+    // Parse and log request payload
+    const requestBody = await req.json();
     const { 
       videoData, 
       videoSize, 
@@ -54,25 +56,42 @@ serve(async (req) => {
       detectLanguages,
       autoDetect,
       uploadMode 
-    } = await req.json();
+    } = requestBody;
 
-    console.log('Processing request:', {
+    // Comprehensive request logging
+    console.log('=== EDGE FUNCTION START ===');
+    console.log('Request Headers:', Object.fromEntries(req.headers.entries()));
+    console.log('Environment Variables Status:', {
+      hasOpenAiKey: !!Deno.env.get('OPENAI_API_KEY'),
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasSupabaseAnonKey: !!Deno.env.get('SUPABASE_ANON_KEY'),
+      hasSupabaseServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      openAiKeyLength: Deno.env.get('OPENAI_API_KEY')?.length || 0
+    });
+    console.log('Request Payload Analysis:', {
       videoSize,
       videoJobId,
       uploadMode,
       primaryLanguage,
       autoDetect,
-      hasVideoData: !!videoData,
-      hasOpenAiKey: !!Deno.env.get('OPENAI_API_KEY')
+      customPromptLength: customPrompt?.length || 0,
+      detectLanguagesCount: detectLanguages?.length || 0,
+      videoDataType: typeof videoData,
+      videoDataLength: videoData?.length || 0,
+      videoDataPreview: videoData?.substring(0, 50) + '...',
+      fullRequestBodyKeys: Object.keys(requestBody),
+      requestBodySize: JSON.stringify(requestBody).length
     });
 
     // Check if OpenAI API key is configured
-    if (!Deno.env.get('OPENAI_API_KEY')) {
-      console.error('OpenAI API key not configured');
+    const openAiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiKey) {
+      console.error('=== CRITICAL ERROR: OpenAI API key not configured ===');
       return new Response(
         JSON.stringify({ 
           error: 'Service configuration error',
-          message: 'AI processing service is not properly configured. Please contact support.'
+          message: 'AI processing service is not properly configured. Please contact support.',
+          details: 'OPENAI_API_KEY environment variable is missing'
         }),
         { 
           status: 500,
@@ -80,10 +99,32 @@ serve(async (req) => {
         }
       );
     }
+    console.log('OpenAI API Key configured, length:', openAiKey.length);
+
+    // Validate required parameters with detailed logging
+    console.log('Parameter validation:', {
+      hasVideoData: !!videoData,
+      videoDataType: typeof videoData,
+      videoDataLength: videoData?.length,
+      hasVideoSize: !!videoSize,
+      videoSize: videoSize,
+      hasVideoJobId: !!videoJobId,
+      videoJobId: videoJobId
+    });
 
     if (!videoData || !videoSize || !videoJobId) {
+      const missingParams = [];
+      if (!videoData) missingParams.push('videoData');
+      if (!videoSize) missingParams.push('videoSize');
+      if (!videoJobId) missingParams.push('videoJobId');
+      
+      console.error('Missing required parameters:', missingParams);
       return new Response(
-        JSON.stringify({ error: 'Missing required parameters' }),
+        JSON.stringify({ 
+          error: 'Missing required parameters', 
+          missing: missingParams,
+          received: { hasVideoData: !!videoData, hasVideoSize: !!videoSize, hasVideoJobId: !!videoJobId }
+        }),
         { 
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -193,16 +234,43 @@ serve(async (req) => {
       })
       .eq('id', videoJobId);
 
-    // Convert base64 to binary using safe decoding
-    console.log('Converting base64 to binary...');
+    // Convert base64 to binary using safe decoding with extensive logging
+    console.log('=== BASE64 DECODING START ===');
+    console.log('VideoData analysis:', {
+      type: typeof videoData,
+      length: videoData?.length,
+      startsWithDataUrl: videoData?.startsWith('data:'),
+      firstChars: videoData?.substring(0, 100),
+      lastChars: videoData?.substring(videoData.length - 100),
+      containsComma: videoData?.includes(','),
+      hasBase64Prefix: videoData?.includes('base64,')
+    });
+
     let binaryVideo;
+    let actualBase64Data = videoData;
+    
     try {
+      // Remove data URL prefix if present (e.g., "data:video/mp4;base64,")
+      if (videoData.includes('base64,')) {
+        actualBase64Data = videoData.split('base64,')[1];
+        console.log('Removed data URL prefix, new length:', actualBase64Data.length);
+      }
+      
+      // Validate base64 format
+      const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+      if (!base64Regex.test(actualBase64Data)) {
+        throw new Error('Invalid base64 format detected');
+      }
+      
+      console.log('Base64 validation passed, attempting decode...');
+      console.log('Actual base64 data length:', actualBase64Data.length);
+      console.log('First 50 chars of base64:', actualBase64Data.substring(0, 50));
+      
       // First, decode the entire base64 string (we can't chunk base64 decoding)
-      console.log('Decoding base64 string, length:', videoData.length);
-      const binaryString = atob(videoData);
+      const binaryString = atob(actualBase64Data);
+      console.log('Base64 decode successful, binary string length:', binaryString.length);
       
       // Then convert to Uint8Array in chunks to prevent memory issues
-      console.log('Converting to Uint8Array, binary length:', binaryString.length);
       const chunkSize = 1024 * 1024; // 1MB chunks for memory efficiency
       binaryVideo = new Uint8Array(binaryString.length);
       
@@ -213,9 +281,20 @@ serve(async (req) => {
         }
       }
       
-      console.log('Successfully converted base64 to binary, size:', binaryVideo.length);
+      console.log('Successfully converted to Uint8Array, final size:', binaryVideo.length);
     } catch (decodeError) {
-      console.error('Base64 decode error:', decodeError);
+      console.error('=== BASE64 DECODE ERROR ===');
+      console.error('Error details:', {
+        name: decodeError.name,
+        message: decodeError.message,
+        stack: decodeError.stack
+      });
+      console.error('VideoData debug info:', {
+        originalLength: videoData?.length,
+        processedLength: actualBase64Data?.length,
+        firstChars: actualBase64Data?.substring(0, 100),
+        hasValidBase64Chars: /^[A-Za-z0-9+/=]*$/.test(actualBase64Data || '')
+      });
       
       // Update job status to failed
       await serviceSupabase
@@ -278,9 +357,22 @@ serve(async (req) => {
       body: formData,
     });
 
+    console.log('OpenAI API Response Status:', whisperResponse.status);
+    console.log('OpenAI API Response Headers:', Object.fromEntries(whisperResponse.headers.entries()));
+    
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
-      console.error('OpenAI Whisper error:', errorText, 'Status:', whisperResponse.status);
+      console.error('=== OPENAI API ERROR ===');
+      console.error('Status Code:', whisperResponse.status);
+      console.error('Status Text:', whisperResponse.statusText);
+      console.error('Error Response:', errorText);
+      console.error('Request FormData sent:', {
+        hasFile: formData.has('file'),
+        model: formData.get('model'),
+        responseFormat: formData.get('response_format'),
+        customPrompt: formData.get('prompt'),
+        language: formData.get('language')
+      });
       
       // Refund tokens on failure for non-subscribers
       if (!isActiveSubscriber) {
@@ -307,8 +399,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Failed to transcribe video', 
-          details: `OpenAI API error: ${whisperResponse.status}`,
-          message: 'The transcription service is currently unavailable. Please try again later.'
+          details: `OpenAI API error: ${whisperResponse.status} - ${errorText}`,
+          message: 'The transcription service returned an error. Check the logs for details.',
+          statusCode: whisperResponse.status,
+          apiResponse: errorText
         }),
         { 
           status: 500,
@@ -318,6 +412,14 @@ serve(async (req) => {
     }
 
     const transcriptionResult = await whisperResponse.json();
+    console.log('OpenAI API Success:', {
+      hasText: !!transcriptionResult.text,
+      textLength: transcriptionResult.text?.length,
+      hasWords: !!transcriptionResult.words,
+      wordsCount: transcriptionResult.words?.length,
+      language: transcriptionResult.language,
+      duration: transcriptionResult.duration
+    });
 
     // Process and store subtitles
     const subtitles = [];
