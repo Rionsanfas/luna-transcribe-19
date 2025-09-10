@@ -56,6 +56,31 @@ serve(async (req) => {
       uploadMode 
     } = await req.json();
 
+    console.log('Processing request:', {
+      videoSize,
+      videoJobId,
+      uploadMode,
+      primaryLanguage,
+      autoDetect,
+      hasVideoData: !!videoData,
+      hasOpenAiKey: !!Deno.env.get('OPENAI_API_KEY')
+    });
+
+    // Check if OpenAI API key is configured
+    if (!Deno.env.get('OPENAI_API_KEY')) {
+      console.error('OpenAI API key not configured');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Service configuration error',
+          message: 'AI processing service is not properly configured. Please contact support.'
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     if (!videoData || !videoSize || !videoJobId) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters' }),
@@ -76,16 +101,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check user's token balance
+    // Check user's token balance and subscription status
     const { data: profile, error: profileError } = await serviceSupabase
       .from('profiles')
-      .select('token_balance, subscription_plan')
+      .select('token_balance, subscription_plan, subscription_status')
       .eq('user_id', user.id)
       .single();
 
     if (profileError) {
+      console.error('Failed to fetch user profile:', profileError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch user profile' }),
+        JSON.stringify({ error: 'Failed to fetch user profile', details: profileError.message }),
         { 
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -93,46 +119,69 @@ serve(async (req) => {
       );
     }
 
-    if ((profile?.token_balance || 0) < tokensNeeded) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Insufficient tokens',
-          tokensNeeded: tokensNeeded.toFixed(1),
-          tokensAvailable: profile?.token_balance || 0
-        }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    // Check if user is an active subscriber (subscribers get unlimited usage)
+    const isActiveSubscriber = profile?.subscription_status === 'active' && 
+                              (profile?.subscription_plan === 'Premium' || profile?.subscription_plan === 'Professional');
+
+    console.log('User profile:', {
+      user_id: user.id,
+      token_balance: profile?.token_balance,
+      subscription_plan: profile?.subscription_plan,
+      subscription_status: profile?.subscription_status,
+      isActiveSubscriber,
+      tokensNeeded
+    });
+
+    // Only check token balance for non-subscribers
+    if (!isActiveSubscriber) {
+      if ((profile?.token_balance || 0) < tokensNeeded) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'Insufficient tokens',
+            tokensNeeded: tokensNeeded.toFixed(1),
+            tokensAvailable: profile?.token_balance || 0
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Deduct tokens for non-subscribers only
+      const { error: updateError } = await serviceSupabase
+        .from('profiles')
+        .update({ token_balance: (profile?.token_balance || 0) - tokensNeeded })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Failed to deduct tokens:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to deduct tokens', details: updateError.message }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
-    // Deduct tokens using exact fractional amount
-    const { error: updateError } = await serviceSupabase
-      .from('profiles')
-      .update({ token_balance: (profile?.token_balance || 0) - tokensNeeded })
-      .eq('user_id', user.id);
-
-    if (updateError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to deduct tokens' }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    // Record token transaction only for non-subscribers
+    if (!isActiveSubscriber) {
+      const { error: transactionError } = await serviceSupabase
+        .from('token_transactions')
+        .insert({
+          user_id: user.id,
+          video_job_id: videoJobId,
+          transaction_type: 'usage',
+          amount: -tokensNeeded,
+          description: 'Subtitle generation'
+        });
+        
+      if (transactionError) {
+        console.error('Failed to record token transaction:', transactionError);
+      }
     }
-
-    // Record token transaction
-    await serviceSupabase
-      .from('token_transactions')
-      .insert({
-        user_id: user.id,
-        video_job_id: videoJobId,
-        transaction_type: 'usage',
-        amount: -tokensNeeded,
-        description: 'Subtitle generation'
-      });
 
     // Update video job status
     await serviceSupabase
@@ -176,6 +225,7 @@ serve(async (req) => {
     // If autoDetect is true, let Whisper automatically detect the language
 
     // Call OpenAI Whisper API
+    console.log('Calling OpenAI Whisper API...');
     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
@@ -186,16 +236,36 @@ serve(async (req) => {
 
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
-      console.error('OpenAI Whisper error:', errorText);
+      console.error('OpenAI Whisper error:', errorText, 'Status:', whisperResponse.status);
       
-      // Refund tokens on failure
+      // Refund tokens on failure for non-subscribers
+      if (!isActiveSubscriber) {
+        const { error: refundError } = await serviceSupabase
+          .from('profiles')
+          .update({ token_balance: (profile?.token_balance || 0) })
+          .eq('user_id', user.id);
+        
+        if (refundError) {
+          console.error('Failed to refund tokens:', refundError);
+        }
+      }
+
+      // Update job status to failed
       await serviceSupabase
-        .from('profiles')
-        .update({ token_balance: (profile?.token_balance || 0) })
-        .eq('user_id', user.id);
+        .from('video_jobs')
+        .update({ 
+          status: 'failed',
+          error_message: `OpenAI API error: ${whisperResponse.status} - ${errorText}`,
+          progress_percentage: 0
+        })
+        .eq('id', videoJobId);
 
       return new Response(
-        JSON.stringify({ error: 'Failed to transcribe video' }),
+        JSON.stringify({ 
+          error: 'Failed to transcribe video', 
+          details: `OpenAI API error: ${whisperResponse.status}`,
+          message: 'The transcription service is currently unavailable. Please try again later.'
+        }),
         { 
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -267,8 +337,35 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Subtitle generation error:', error);
+    
+    // Try to update job status to failed if we have the videoJobId
+    try {
+      const { videoJobId } = await req.json().catch(() => ({}));
+      if (videoJobId) {
+        const serviceSupabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+        
+        await serviceSupabase
+          .from('video_jobs')
+          .update({ 
+            status: 'failed',
+            error_message: error.message || 'Unknown error occurred',
+            progress_percentage: 0
+          })
+          .eq('id', videoJobId);
+      }
+    } catch (updateError) {
+      console.error('Failed to update job status:', updateError);
+    }
+    
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error',
+        message: 'An unexpected error occurred. Please try again later.',
+        details: error.message
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
