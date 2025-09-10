@@ -6,11 +6,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { getFileSizeLimit } from "@/components/Pricing";
 import { TranscriptionSection } from "./TranscriptionSection";
-import { Upload, FileVideo } from "lucide-react";
+import { Upload, FileVideo, CheckCircle, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 
 export const TranscribeUploadSection = () => {
-  const { user, tokenBalance } = useAuth();
+  const { user, tokenBalance, refreshTokenBalance } = useAuth();
   const { toast } = useToast();
   const [dragOver, setDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -18,6 +19,7 @@ export const TranscribeUploadSection = () => {
   const [currentVideo, setCurrentVideo] = useState<File | null>(null);
   const [transcriptionResult, setTranscriptionResult] = useState<string>("");
   const [pendingVideoJob, setPendingVideoJob] = useState<any>(null);
+  const [processingStage, setProcessingStage] = useState<string>("");
 
   // Transcription settings
   const [primaryLanguage, setPrimaryLanguage] = useState("en");
@@ -53,7 +55,7 @@ export const TranscribeUploadSection = () => {
     if (!file.type.startsWith('video/')) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a video file for transcription.",
+        description: "Please upload a video file (MP4, MOV, AVI, etc.)",
         variant: "destructive",
       });
       return;
@@ -69,6 +71,16 @@ export const TranscribeUploadSection = () => {
     }
 
     const fileSizeMB = file.size / (1024 * 1024);
+
+    // Check file size limits
+    if (fileSizeMB > 100) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 100MB for processing.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       const { data: profile, error: profileError } = await supabase
@@ -93,6 +105,7 @@ export const TranscribeUploadSection = () => {
 
       setCurrentVideo(file);
 
+      // Create video job record
       const { data: videoJob, error: jobError } = await supabase
         .from('video_jobs')
         .insert({
@@ -112,7 +125,7 @@ export const TranscribeUploadSection = () => {
       
       toast({
         title: "Video uploaded successfully!",
-        description: `${file.name} is ready for transcription. Click "Process with AI" to start.`,
+        description: `${file.name} is ready for transcription.`,
       });
 
     } catch (error: any) {
@@ -130,126 +143,88 @@ export const TranscribeUploadSection = () => {
 
     setIsProcessing(true);
     setUploadProgress(0);
+    setProcessingStage("Initializing...");
 
     try {
       const fileSizeMB = currentVideo.size / (1024 * 1024);
       
+      // Check token balance
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('subscription_plan, subscription_status, token_balance')
+        .select('token_balance')
         .eq('user_id', user.id)
         .single();
 
       if (profileError) throw profileError;
 
-      const isSubscriber = profile?.subscription_status === 'active';
-      let tokensRequired = fileSizeMB / 10;
+      const tokensRequired = Math.ceil(fileSizeMB / 10);
       
-      if (isSubscriber) {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const { data: recentJobs, error: jobsError } = await supabase
-          .from('video_jobs')
-          .select('file_size_mb')
-          .eq('user_id', user.id)
-          .gte('created_at', thirtyDaysAgo.toISOString())
-          .eq('status', 'completed');
-        
-        if (!jobsError && recentJobs) {
-          const totalProcessedMB = recentJobs.reduce((sum, job) => sum + (job.file_size_mb || 0), 0);
-          const freeAllowanceMB = 3 * 10;
-          
-          if (totalProcessedMB + fileSizeMB <= freeAllowanceMB) {
-            tokensRequired = 0;
-          } else if (totalProcessedMB < freeAllowanceMB) {
-            const exceededMB = (totalProcessedMB + fileSizeMB) - freeAllowanceMB;
-            tokensRequired = exceededMB / 10;
-          }
-        }
-      }
-
-      if (tokenBalance < tokensRequired) {
+      if ((profile?.token_balance || 0) < tokensRequired) {
         toast({
           title: "Insufficient tokens",
-          description: `You need ${tokensRequired.toFixed(1)} tokens but only have ${tokenBalance}. Please purchase more tokens.`,
+          description: `You need ${tokensRequired} tokens but only have ${profile?.token_balance || 0}. Please purchase more tokens.`,
           variant: "destructive",
         });
         return;
       }
 
-      console.log('=== FRONTEND PROCESSING START ===');
-      console.log('File details:', {
-        name: currentVideo.name,
-        size: currentVideo.size,
-        type: currentVideo.type,
-        lastModified: currentVideo.lastModified,
-        fileSizeMB: fileSizeMB
-      });
-
-      if (currentVideo.size > 100 * 1024 * 1024) {
-        throw new Error('File too large for processing. Maximum size is 100MB.');
-      }
-
+      setProcessingStage("Preparing video...");
       setUploadProgress(10);
 
-      console.log('Starting file conversion to base64...');
+      console.log('Starting video processing:', {
+        fileName: currentVideo.name,
+        fileSizeMB: fileSizeMB,
+        tokensRequired: tokensRequired
+      });
+
+      // Convert video to base64
       const arrayBuffer = await currentVideo.arrayBuffer();
-      console.log('ArrayBuffer created, size:', arrayBuffer.byteLength);
-      
       const uint8Array = new Uint8Array(arrayBuffer);
-      console.log('Uint8Array created, length:', uint8Array.length);
       
-      // Convert to base64 more reliably
-      const chunkSize = 32768; // 32KB chunks
+      // Convert to base64 in chunks
+      const chunkSize = 32768;
       let base64 = '';
       
-      console.log('Converting to base64 in chunks of', chunkSize);
+      setProcessingStage("Converting video format...");
+      
       for (let i = 0; i < uint8Array.length; i += chunkSize) {
         const chunk = uint8Array.subarray(i, i + chunkSize);
         const chunkString = String.fromCharCode.apply(null, Array.from(chunk));
         const chunkBase64 = btoa(chunkString);
         base64 += chunkBase64;
         
-        if (i % (chunkSize * 10) === 0) {
-          console.log(`Progress: ${Math.round((i / uint8Array.length) * 100)}%`);
-        }
+        // Update progress
+        const progress = 10 + (i / uint8Array.length) * 20;
+        setUploadProgress(progress);
       }
-      
-      console.log('Base64 conversion complete:', {
-        originalSize: uint8Array.length,
-        base64Length: base64.length,
-        base64Preview: base64.substring(0, 100) + '...',
-        base64Suffix: '...' + base64.substring(base64.length - 100)
-      });
 
+      setProcessingStage("Sending to AI service...");
       setUploadProgress(30);
 
+      // Get auth session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Authentication failed');
 
-      console.log('=== SENDING REQUEST TO EDGE FUNCTION ===');
+      // Prepare request payload
       const requestPayload = {
         videoData: base64,
         videoSize: currentVideo.size,
         videoJobId: pendingVideoJob.id,
         primaryLanguage: autoDetect ? null : primaryLanguage,
-        detectLanguages: autoDetect ? [] : detectLanguages,
         autoDetect: autoDetect,
-        uploadMode: 'transcribe'
+        customPrompt: ""
       };
-      
-      console.log('Request payload summary:', {
-        hasVideoData: !!requestPayload.videoData,
-        videoDataLength: requestPayload.videoData?.length,
-        videoSize: requestPayload.videoSize,
-        videoJobId: requestPayload.videoJobId,
-        primaryLanguage: requestPayload.primaryLanguage,
-        detectLanguagesCount: requestPayload.detectLanguages?.length,
-        autoDetect: requestPayload.autoDetect,
-        uploadMode: requestPayload.uploadMode
+
+      console.log('Sending to edge function:', {
+        videoDataLength: base64.length,
+        videoSize: currentVideo.size,
+        videoJobId: pendingVideoJob.id
       });
 
+      setProcessingStage("AI is transcribing your video...");
+      setUploadProgress(50);
+
+      // Call edge function
       const { data, error } = await supabase.functions.invoke('generate-subtitles', {
         body: requestPayload,
         headers: {
@@ -257,43 +232,53 @@ export const TranscribeUploadSection = () => {
         },
       });
       
-      console.log('Edge function response:', { data, error });
-      
       if (error) {
-        console.error('=== EDGE FUNCTION ERROR ===');
-        console.error('Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-          context: error.context
-        });
-        
-        // Try to extract better error message from the data response if available
-        let errorMessage = error.message;
-        let errorDetails = '';
-        
-        if (data?.error) {
-          errorMessage = data.error;
-          errorDetails = data.details || data.message || '';
-        } else if (error.message?.includes('non-2xx status code')) {
-          errorMessage = 'Processing failed on server';
-          errorDetails = 'The edge function returned an error. Check the function logs for details.';
-        }
-        
-        throw new Error(`${errorMessage}${errorDetails ? ': ' + errorDetails : ''}`);
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Processing failed on server');
       }
 
+      setUploadProgress(90);
+      setProcessingStage("Finalizing...");
+
+      // Deduct tokens
+      const { error: tokenError } = await supabase
+        .from('token_transactions')
+        .insert({
+          user_id: user.id,
+          video_job_id: pendingVideoJob.id,
+          amount: -tokensRequired,
+          transaction_type: 'usage',
+          description: `Transcription of ${currentVideo.name}`
+        });
+
+      if (tokenError) {
+        console.error('Token deduction error:', tokenError);
+      }
+
+      // Update user's token balance
+      await supabase
+        .from('profiles')
+        .update({ 
+          token_balance: (profile?.token_balance || 0) - tokensRequired 
+        })
+        .eq('user_id', user.id);
+
       setUploadProgress(100);
+      setProcessingStage("Complete!");
       setTranscriptionResult(data?.transcription || "Transcription completed successfully!");
       setPendingVideoJob(null);
       
+      // Refresh token balance in context
+      await refreshTokenBalance();
+      
       toast({
         title: "Transcription complete!",
-        description: `Successfully transcribed ${currentVideo.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
+        description: `Successfully transcribed ${currentVideo.name}. Used ${tokensRequired} tokens.`,
       });
 
     } catch (error: any) {
       console.error('Processing error:', error);
+      setProcessingStage("Failed");
       toast({
         title: "Processing failed",
         description: error.message || "Failed to process the file. Please try again.",
@@ -301,8 +286,19 @@ export const TranscribeUploadSection = () => {
       });
     } finally {
       setIsProcessing(false);
-      setTimeout(() => setUploadProgress(0), 2000);
+      setTimeout(() => {
+        setUploadProgress(0);
+        setProcessingStage("");
+      }, 2000);
     }
+  };
+
+  const resetUpload = () => {
+    setCurrentVideo(null);
+    setTranscriptionResult("");
+    setUploadProgress(0);
+    setPendingVideoJob(null);
+    setProcessingStage("");
   };
 
   return (
@@ -364,28 +360,39 @@ export const TranscribeUploadSection = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground px-4 leading-relaxed font-fredoka">
-                  Supported: MP4, MOV, AVI • Cost: 1 token per 10MB
+                  Supported: MP4, MOV, AVI • Max: 100MB • Cost: 1 token per 10MB
                 </p>
               </>
             ) : (
               <div className="space-y-4">
-                <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                  <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
+                <div className={`mx-auto w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center ${
+                  transcriptionResult ? 'bg-green-100 dark:bg-green-900' : 'bg-blue-100 dark:bg-blue-900'
+                }`}>
+                  {transcriptionResult ? (
+                    <CheckCircle className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
+                  ) : (
+                    <FileVideo className="h-6 w-6 md:h-8 md:w-8 text-blue-600" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4 text-foreground">{currentVideo.name}</h3>
+                  <h3 className="font-fredoka text-lg md:text-xl font-semibold break-words px-4 text-foreground">
+                    {currentVideo.name}
+                  </h3>
                   <p className="text-muted-foreground text-sm md:text-base font-fredoka">
                     {Math.round(currentVideo.size / (1024 * 1024))}MB • 
-                    Cost: {((currentVideo.size / (1024 * 1024)) / 10).toFixed(1)} tokens
+                    Cost: {Math.ceil((currentVideo.size / (1024 * 1024)) / 10)} tokens
                   </p>
                 </div>
                 
                 {isProcessing && (
-                  <div className="flex flex-col items-center space-y-3 px-4">
-                    <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    <p className="text-sm text-muted-foreground font-fredoka">
-                      Transcribing video with AI...
-                    </p>
+                  <div className="space-y-3 px-4">
+                    <Progress value={uploadProgress} className="w-full" />
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                      <p className="text-sm text-muted-foreground font-fredoka">
+                        {processingStage}
+                      </p>
+                    </div>
                   </div>
                 )}
                 
@@ -400,15 +407,11 @@ export const TranscribeUploadSection = () => {
                   )}
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setCurrentVideo(null);
-                      setTranscriptionResult("");
-                      setUploadProgress(0);
-                    }}
+                    onClick={resetUpload}
                     disabled={isProcessing}
                     className="min-h-[44px] touch-manipulation font-fredoka"
                   >
-                    Upload Different File
+                    {transcriptionResult ? "Process Another Video" : "Upload Different File"}
                   </Button>
                 </div>
               </div>
@@ -420,9 +423,16 @@ export const TranscribeUploadSection = () => {
       {/* Results */}
       {transcriptionResult && (
         <GlassCard className="p-4 md:p-6">
-          <h3 className="font-fredoka text-lg font-semibold mb-4 text-foreground">Transcription Result</h3>
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <pre className="whitespace-pre-wrap text-sm">{transcriptionResult}</pre>
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <h3 className="font-fredoka text-lg font-semibold text-foreground">Transcription Complete</h3>
+          </div>
+          <div className="bg-muted/50 p-4 rounded-lg border">
+            <pre className="whitespace-pre-wrap text-sm font-mono">{transcriptionResult}</pre>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground">
+            <p>✓ Subtitles have been generated and saved to your account</p>
+            <p>✓ You can now view and edit them in the video workspace</p>
           </div>
         </GlassCard>
       )}
