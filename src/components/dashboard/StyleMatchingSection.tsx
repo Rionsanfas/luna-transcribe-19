@@ -253,7 +253,7 @@ export const StyleMatchingSection = ({ hasVideo, onStyleMatch }: StyleMatchingSe
 
         {/* Upload Area */}
         <div
-          className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
             dragOver
               ? 'border-primary bg-primary/5'
               : uploadedImage
@@ -263,6 +263,7 @@ export const StyleMatchingSection = ({ hasVideo, onStyleMatch }: StyleMatchingSe
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
+          onClick={() => fileInputRef.current?.click()}
         >
           <input
             ref={fileInputRef}
@@ -301,14 +302,7 @@ export const StyleMatchingSection = ({ hasVideo, onStyleMatch }: StyleMatchingSe
               <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto" />
               <div>
                 <p className="text-lg font-medium text-foreground">
-                  Drop an image here or{" "}
-                  <Button
-                    variant="link"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-0 h-auto text-primary"
-                  >
-                    browse files
-                  </Button>
+                  Drop an image here or <span className="text-primary">browse files</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
                   PNG, JPG, WEBP up to 10MB

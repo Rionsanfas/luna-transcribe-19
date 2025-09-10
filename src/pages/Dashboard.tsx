@@ -169,7 +169,7 @@ const Dashboard = () => {
           user_id: user.id,
           original_filename: file.name,
           file_size_mb: Math.round(fileSizeMB),
-          processing_type: uploadMode === 'transcribe' ? 'transcription' : 'transcription_translation',
+          processing_type: uploadMode === 'transcribe' ? 'transcription' : (uploadMode === 'translate' ? 'translation' : 'style_matching'),
           status: 'pending',
           target_language: uploadMode === 'transcribe' ? (autoDetect ? 'auto' : primaryLanguage) : sourceLanguage
         })
@@ -448,6 +448,56 @@ const Dashboard = () => {
           maintainTiming={maintainTiming}
           onMaintainTimingChange={setMaintainTiming}
         />
+
+        {/* Process Button */}
+        {(uploadMode === 'transcribe' || uploadMode === 'translate') && (
+          <GlassCard className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="text-center sm:text-left">
+                <h3 className="font-fredoka text-lg font-semibold text-foreground mb-1">
+                  Ready to Process
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Upload your video to start {uploadMode === 'transcribe' ? 'transcription' : 'transcription and translation'}
+                </p>
+              </div>
+              
+              <div
+                className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                  dragOver
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted-foreground/25 hover:border-primary/50'
+                }`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => document.getElementById('video-upload')?.click()}
+              >
+                <input
+                  id="video-upload"
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                
+                {isProcessing ? (
+                  <div className="space-y-2">
+                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-xs text-muted-foreground">Processing... {uploadProgress}%</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="w-6 h-6 text-muted-foreground mx-auto" />
+                    <p className="text-sm font-medium text-foreground">
+                      Drop video here or <span className="text-primary">browse</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </GlassCard>
+        )}
 
         {/* Style Matching Section */}
         {uploadMode === 'style-match' && currentVideo && (
