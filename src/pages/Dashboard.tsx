@@ -124,19 +124,20 @@ const Dashboard = () => {
     }
 
     const fileSizeMB = file.size / (1024 * 1024);
-    // Use exact fractional calculation: 1 token = 10MB = $0.20
-    const tokensRequired = fileSizeMB / 10;
 
     // Get user's subscription plan and file size limits
     try {
+      // Use exact fractional calculation: 1 token = 10MB = $0.20
+      // For subscribers: allow 3 stacks (3 files) before charging tokens
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('subscription_plan, token_balance')
+        .select('subscription_plan, subscription_status, token_balance')
         .eq('user_id', user.id)
         .single();
 
       if (profileError) throw profileError;
 
+      const isSubscriber = profile?.subscription_status === 'active';
       const userPlan = profile?.subscription_plan || 'free';
       const maxFileSizeMB = getFileSizeLimit(userPlan);
       
@@ -147,6 +148,35 @@ const Dashboard = () => {
           variant: "destructive",
         });
         return;
+      }
+
+      // Check how many files user has processed recently (for subscriber free allowance)
+      let tokensRequired = fileSizeMB / 10;
+      
+      if (isSubscriber) {
+        // Check recent uploads for subscribers (3 free stacks per billing period)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const { data: recentJobs, error: jobsError } = await supabase
+          .from('video_jobs')
+          .select('file_size_mb')
+          .eq('user_id', user.id)
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .eq('status', 'completed');
+        
+        if (!jobsError && recentJobs) {
+          const totalProcessedMB = recentJobs.reduce((sum, job) => sum + (job.file_size_mb || 0), 0);
+          const freeAllowanceMB = 3 * 10; // 3 stacks of 10MB each = 30MB free
+          
+          if (totalProcessedMB + fileSizeMB <= freeAllowanceMB) {
+            tokensRequired = 0; // Free for subscribers within their allowance
+          } else if (totalProcessedMB < freeAllowanceMB) {
+            // Partial charge - only for the amount exceeding free allowance
+            const exceededMB = (totalProcessedMB + fileSizeMB) - freeAllowanceMB;
+            tokensRequired = exceededMB / 10;
+          }
+        }
       }
 
       if (tokenBalance < tokensRequired) {
@@ -258,7 +288,7 @@ const Dashboard = () => {
       
       toast({
         title: "Processing complete!",
-        description: `Successfully processed ${file.name}. Used ${tokensRequired.toFixed(1)} tokens.`,
+        description: `Successfully processed ${file.name}. ${tokensRequired > 0 ? `Used ${tokensRequired.toFixed(1)} tokens.` : 'Processed using your subscriber allowance.'}`,
       });
 
     } catch (error: any) {
@@ -346,6 +376,11 @@ const Dashboard = () => {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={async () => {
+                    toast({
+                      title: "Opening billing portal...",
+                      description: "Redirecting you to manage your subscription.",
+                    });
+                    
                     try {
                       const { data: { session } } = await supabase.auth.getSession();
                       if (!session?.access_token) throw new Error('Not authenticated');
@@ -355,11 +390,16 @@ const Dashboard = () => {
                       });
                       
                       if (error) throw error;
-                      if (data?.url) window.open(data.url, '_blank');
+                      if (data?.url) {
+                        window.open(data.url, '_blank');
+                      } else {
+                        throw new Error('No portal URL returned');
+                      }
                     } catch (error: any) {
+                      console.error('Billing portal error:', error);
                       toast({
                         title: "Billing portal error",
-                        description: error.message || "Unable to open billing portal",
+                        description: error.message || "Unable to open billing portal. Please try again.",
                         variant: "destructive",
                       });
                     }
