@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('=== EDGE FUNCTION START ===');
+  console.log('=== GENERATE SUBTITLES START ===');
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,18 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
-    const requestBody = await req.json();
-    const { videoData, videoSize, videoJobId, customPrompt, primaryLanguage, detectLanguages, autoDetect, uploadMode } = requestBody;
-    
-    console.log('Request received:', {
-      videoDataLength: videoData?.length,
-      videoSize,
-      videoJobId,
-      uploadMode
-    });
-
-    // Check required environment variables
+    // Get environment variables
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -37,7 +26,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Service configuration error',
-          details: 'Required environment variables are missing'
+          details: 'Required API keys not configured'
         }),
         { 
           status: 500,
@@ -46,26 +35,25 @@ serve(async (req) => {
       );
     }
 
+    // Parse request body
+    const requestBody = await req.json();
+    const { videoData, videoSize, videoJobId, customPrompt, primaryLanguage, autoDetect } = requestBody;
+    
+    console.log('Request details:', {
+      hasVideoData: !!videoData,
+      videoDataLength: videoData?.length,
+      videoSize,
+      videoJobId,
+      autoDetect
+    });
+
     // Validate required parameters
     if (!videoData || !videoSize || !videoJobId) {
-      console.error('Missing required parameters:', {
-        hasVideoData: !!videoData,
-        videoDataType: typeof videoData,
-        videoDataLength: videoData?.length,
-        hasVideoSize: !!videoSize,
-        videoSize,
-        hasVideoJobId: !!videoJobId,
-        videoJobId
-      });
+      console.error('Missing required parameters');
       return new Response(
         JSON.stringify({ 
           error: 'Missing required parameters',
-          required: ['videoData', 'videoSize', 'videoJobId'],
-          received: {
-            hasVideoData: !!videoData,
-            hasVideoSize: !!videoSize,
-            hasVideoJobId: !!videoJobId
-          }
+          details: 'videoData, videoSize, and videoJobId are required'
         }),
         { 
           status: 400,
@@ -75,7 +63,6 @@ serve(async (req) => {
     }
 
     // Create Supabase clients
-    const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '');
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify user authentication
@@ -87,21 +74,9 @@ serve(async (req) => {
       );
     }
 
-    const token = authorization.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-
-    if (userError || !user) {
-      console.error('Authentication failed:', userError);
-      return new Response(
-        JSON.stringify({ error: 'Authentication failed' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('User authenticated:', user.id);
-
     // Update job status to processing
-    await serviceSupabase
+    console.log('Updating job status to processing...');
+    const { error: updateError } = await serviceSupabase
       .from('video_jobs')
       .update({ 
         status: 'processing',
@@ -109,9 +84,17 @@ serve(async (req) => {
       })
       .eq('id', videoJobId);
 
-    // Convert base64 to binary using chunked processing for large files
+    if (updateError) {
+      console.error('Error updating job status:', updateError);
+      return new Response(
+        JSON.stringify({ error: 'Database update failed' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Convert base64 to binary
     console.log('Converting base64 to binary...');
-    let binaryVideo;
+    let binaryVideo: Uint8Array;
     
     try {
       // Remove data URL prefix if present
@@ -120,49 +103,17 @@ serve(async (req) => {
         cleanBase64 = videoData.split('base64,')[1];
       }
       
-      console.log('Processing base64 in chunks, length:', cleanBase64.length);
-      
-      // Process base64 in chunks to prevent memory issues
-      function processBase64Chunks(base64String: string, chunkSize = 32768) {
-        const chunks: Uint8Array[] = [];
-        let position = 0;
-        
-        // Ensure chunk size is multiple of 4 for valid base64 padding
-        const validChunkSize = Math.floor(chunkSize / 4) * 4;
-        
-        while (position < base64String.length) {
-          const chunk = base64String.slice(position, Math.min(position + validChunkSize, base64String.length));
-          
-          try {
-            const binaryChunk = atob(chunk);
-            const bytes = new Uint8Array(binaryChunk.length);
-            
-            for (let i = 0; i < binaryChunk.length; i++) {
-              bytes[i] = binaryChunk.charCodeAt(i);
-            }
-            
-            chunks.push(bytes);
-          } catch (chunkError) {
-            console.error('Error processing chunk at position', position, ':', chunkError.message);
-            throw new Error(`Base64 decode failed at position ${position}: ${chunkError.message}`);
-          }
-          
-          position += validChunkSize;
+      // Simple base64 decode for smaller files
+      if (videoSize < 50 * 1024 * 1024) { // 50MB limit for simple decode
+        const binaryString = atob(cleanBase64);
+        binaryVideo = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          binaryVideo[i] = binaryString.charCodeAt(i);
         }
-
-        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-
-        for (const chunk of chunks) {
-          result.set(chunk, offset);
-          offset += chunk.length;
-        }
-
-        return result;
+      } else {
+        throw new Error('File too large for processing');
       }
-
-      binaryVideo = processBase64Chunks(cleanBase64);
+      
       console.log('Base64 conversion successful, binary size:', binaryVideo.length);
       
     } catch (decodeError) {

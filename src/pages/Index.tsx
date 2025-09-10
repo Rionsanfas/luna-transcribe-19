@@ -1,23 +1,44 @@
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { TopNavigation } from "@/components/TopNavigation";
 import { Hero } from "@/components/Hero";
 import { Features } from "@/components/Features";
 import { Pricing } from "@/components/Pricing";
 import { Footer } from "@/components/Footer";
+import { useEffect } from "react";
 
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-background relative">
-      <TopNavigation />
-      <div className="pt-20 md:pt-24"> {/* Responsive padding for fixed nav */}
-        <Hero />
-        <section id="features">
-          <Features />
-        </section>
-        <section id="pricing">
-          <Pricing />
-        </section>
-        <Footer />
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    // Redirect authenticated users to dashboard
+    if (!loading && user) {
+      navigate("/dashboard");
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  // Only show landing page if user is not authenticated
+  if (user) {
+    return null; // Will redirect to dashboard
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <TopNavigation />
+      <Hero />
+      <Features />
+      <Pricing />
+      <Footer />
     </div>
   );
 };
