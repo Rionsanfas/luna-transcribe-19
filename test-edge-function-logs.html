@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Edge Function Logs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #b8daff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Edge Function Logs Test</h1>
+        <p>This page tests the edge functions and checks if logs are working properly.</p>
+        
+        <div>
+            <button onclick="testLogsFunction()">Test Logs Function</button>
+            <button onclick="testGenerateSubtitles()">Test Generate Subtitles (Basic)</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://fbzsjvifhhaumzjedvmj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZienNqdmlmaGhhdW16amVkdm1qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcwNTMwNDUsImV4cCI6MjA3MjYyOTA0NX0.rQgAu0UxgjEBsQvge65e08Or4VvpHafUKmPTke9FagU';
+
+        function addResult(type, message) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function testLogsFunction() {
+            addResult('info', 'Testing logs function...');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/test-logs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        test: 'logs function test',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                const data = await response.text();
+                
+                if (response.ok) {
+                    addResult('success', `Test Logs Function SUCCESS:\n${data}`);
+                } else {
+                    addResult('error', `Test Logs Function ERROR (${response.status}):\n${data}`);
+                }
+                
+            } catch (error) {
+                addResult('error', `Test Logs Function FETCH ERROR:\n${error.message}`);
+            }
+        }
+
+        async function testGenerateSubtitles() {
+            addResult('info', 'Testing generate-subtitles function (basic test)...');
+            
+            try {
+                // Simple test payload
+                const testPayload = {
+                    videoData: 'dGVzdCBkYXRh', // "test data" in base64
+                    videoSize: 1000,
+                    videoJobId: 'test-job-id-12345',
+                    autoDetect: true
+                };
+                
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-subtitles`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json',
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify(testPayload)
+                });
+                
+                const data = await response.text();
+                
+                if (response.ok) {
+                    addResult('success', `Generate Subtitles SUCCESS (${response.status}):\n${data}`);
+                } else {
+                    addResult('error', `Generate Subtitles ERROR (${response.status}):\n${data}`);
+                }
+                
+            } catch (error) {
+                addResult('error', `Generate Subtitles FETCH ERROR:\n${error.message}`);
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Auto-run tests on page load
+        window.onload = function() {
+            addResult('info', 'Page loaded. Ready to test edge functions.');
+            addResult('info', 'Note: Check Supabase dashboard logs after running tests.');
+        };
+    </script>
+</body>
+</html>

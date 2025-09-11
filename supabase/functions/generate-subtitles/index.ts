@@ -9,9 +9,12 @@ const corsHeaders = {
 
 serve(async (req) => {
   console.log('=== GENERATE SUBTITLES START ===');
+  console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -94,27 +97,45 @@ serve(async (req) => {
 
     // Convert base64 to binary
     console.log('Converting base64 to binary...');
+    console.log('Video data type:', typeof videoData);
+    console.log('Video data starts with:', videoData.substring(0, 50));
+    
     let binaryVideo: Uint8Array;
     
     try {
       // Remove data URL prefix if present
       let cleanBase64 = videoData;
-      if (videoData.includes('base64,')) {
+      if (typeof videoData === 'string' && videoData.includes('base64,')) {
         cleanBase64 = videoData.split('base64,')[1];
+        console.log('Removed data URL prefix, new length:', cleanBase64.length);
       }
       
-      // Simple base64 decode for smaller files
-      if (videoSize < 50 * 1024 * 1024) { // 50MB limit for simple decode
-        const binaryString = atob(cleanBase64);
-        binaryVideo = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          binaryVideo[i] = binaryString.charCodeAt(i);
+      // Validate base64 string
+      if (!cleanBase64 || typeof cleanBase64 !== 'string') {
+        throw new Error('Invalid base64 data provided');
+      }
+      
+      // Clean the base64 string
+      cleanBase64 = cleanBase64.replace(/[^A-Za-z0-9+/=]/g, '');
+      console.log('Cleaned base64 length:', cleanBase64.length);
+      
+      // Use TextDecoder for proper base64 decoding
+      if (videoSize < 50 * 1024 * 1024) { // 50MB limit
+        try {
+          // Use the built-in base64 decoder
+          const binaryString = atob(cleanBase64);
+          binaryVideo = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            binaryVideo[i] = binaryString.charCodeAt(i);
+          }
+          console.log('Base64 conversion successful, binary size:', binaryVideo.length);
+        } catch (atobError) {
+          console.error('atob failed:', atobError.message);
+          throw new Error(`Base64 decoding failed: ${atobError.message}`);
         }
       } else {
-        throw new Error('File too large for processing');
+        throw new Error('File too large for processing (max 50MB)');
       }
-      
-      console.log('Base64 conversion successful, binary size:', binaryVideo.length);
       
     } catch (decodeError) {
       console.error('Base64 decode failed:', decodeError.message);

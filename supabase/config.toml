@@ -95,3 +95,6 @@ verify_jwt = false
 
 [functions.test-minimal]
 verify_jwt = false
+
+[functions.test-logs]
+verify_jwt = false
