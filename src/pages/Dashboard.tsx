@@ -1,16 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, Play, Download, FileText, Languages, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TopNavigation } from "@/components/TopNavigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
+  const { user, session, tokenBalance, refreshTokenBalance } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
   const [activeAction, setActiveAction] = useState<"translation" | "transcription" | "style-matching">("transcription");
   const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
   const [uploadedStyleImage, setUploadedStyleImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any>(null);
+  const [jobStatus, setJobStatus] = useState<string>('');
+
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+    }
+  }, [user, navigate]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -34,27 +50,179 @@ const Dashboard = () => {
     }
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]); // Remove data:video/mp4;base64, prefix
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const handleSendToAI = async () => {
+    if (!session || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to process videos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check token balance
+    if (tokenBalance < 1) {
+      toast({
+        title: "Insufficient tokens",
+        description: "You need at least 1 token to process a video.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Validation for style matching - requires both video and image
     if (activeAction === "style-matching") {
       if (!uploadedVideo || !uploadedStyleImage) {
-        alert('Style matching requires both a video file and a style reference image');
+        toast({
+          title: "Missing files",
+          description: "Style matching requires both a video file and a style reference image.",
+          variant: "destructive",
+        });
         return;
       }
     } else {
-      if (!uploadedVideo) return;
+      if (!uploadedVideo) {
+        toast({
+          title: "No video file",
+          description: "Please upload a video file first.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     setIsProcessing(true);
-    // Simulate AI processing
-    setTimeout(() => {
-      setResults({
-        videoUrl: URL.createObjectURL(uploadedVideo!),
-        subtitles: `Sample ${activeAction} result would appear here...`
+    setJobStatus('Uploading video...');
+
+    try {
+      // Convert files to base64
+      const videoBase64 = await fileToBase64(uploadedVideo);
+      let styleImageBase64;
+      
+      if (uploadedStyleImage) {
+        styleImageBase64 = await fileToBase64(uploadedStyleImage);
+      }
+
+      setJobStatus('Processing with AI...');
+
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke('process-video-job', {
+        body: {
+          processingType: activeAction,
+          videoFile: videoBase64,
+          styleImageFile: styleImageBase64,
+          targetLanguage: activeAction === 'translation' ? 'Spanish' : undefined,
+          originalFilename: uploadedVideo.name
+        }
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.success) {
+        setResults({
+          jobId: data.jobId,
+          videoUrl: URL.createObjectURL(uploadedVideo),
+          subtitles: data.result?.subtitles || [],
+          styleAnalysis: data.result?.styleAnalysis
+        });
+
+        // Refresh token balance
+        await refreshTokenBalance();
+
+        toast({
+          title: "Processing complete!",
+          description: `Your ${activeAction} has been completed successfully.`,
+        });
+      } else {
+        throw new Error(data.error || 'Processing failed');
+      }
+
+    } catch (error: any) {
+      console.error('Processing error:', error);
+      toast({
+        title: "Processing failed",
+        description: error.message || "An error occurred while processing your video.",
+        variant: "destructive",
+      });
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+      setJobStatus('');
+    }
   };
+
+  const handleDownload = async (format: 'mp4' | 'mov' | 'srt') => {
+    if (!results?.jobId) return;
+
+    try {
+      if (format === 'srt') {
+        // Generate SRT file from subtitles
+        const srtContent = Array.isArray(results.subtitles) 
+          ? results.subtitles.map((subtitle: any, index: number) => {
+              const startTime = formatTimeForSRT(subtitle.start || index * 2);
+              const endTime = formatTimeForSRT(subtitle.end || (index + 1) * 2);
+              return `${index + 1}\n${startTime} --> ${endTime}\n${subtitle.text}\n\n`;
+            }).join('')
+          : '1\n00:00:00,000 --> 00:00:05,000\nNo subtitles available\n\n';
+
+        const blob = new Blob([srtContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `subtitles.srt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // For video downloads, we'd normally get the processed video from storage
+        // For now, download the original video with a different name
+        if (uploadedVideo) {
+          const url = URL.createObjectURL(uploadedVideo);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `processed_${uploadedVideo.name.replace(/\.[^/.]+$/, '')}.${format}`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }
+
+      toast({
+        title: "Download started",
+        description: `Your ${format.toUpperCase()} file is being downloaded.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "There was an error downloading the file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatTimeForSRT = (seconds: number) => {
+    const date = new Date(seconds * 1000);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+  };
+
+  if (!user) {
+    return null; // Will redirect via useEffect
+  }
 
   const ActionCard = ({ 
     id, 
@@ -92,9 +260,14 @@ const Dashboard = () => {
       <TopNavigation />
       
       <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Action Selection */}
-        <section className="space-y-4">
-          <h1 className="text-3xl font-bold text-center">Choose Your Action</h1>
+        {/* Header with token balance */}
+        <section className="text-center space-y-4">
+          <div className="flex justify-center items-center gap-4">
+            <h1 className="text-3xl font-bold">Choose Your Action</h1>
+            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+              {tokenBalance} tokens available
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <ActionCard
               id="transcription"
@@ -206,12 +379,18 @@ const Dashboard = () => {
                 disabled={
                   isProcessing || 
                   !uploadedVideo || 
-                  (activeAction === "style-matching" && !uploadedStyleImage)
+                  (activeAction === "style-matching" && !uploadedStyleImage) ||
+                  tokenBalance < 1
                 }
                 className="w-full"
                 size="lg"
               >
-                {isProcessing ? "Processing..." : "Send to AI"}
+                {isProcessing ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    {jobStatus || "Processing..."}
+                  </div>
+                ) : tokenBalance < 1 ? "Insufficient Tokens" : "Send to AI (1 token)"}
               </Button>
             </div>
           </Card>
@@ -250,13 +429,33 @@ const Dashboard = () => {
                     <textarea
                       className="w-full h-48 p-4 border rounded-lg resize-none bg-background"
                       placeholder="Subtitles will appear here for editing..."
-                      defaultValue={results.subtitles}
+                      defaultValue={Array.isArray(results.subtitles) 
+                        ? results.subtitles.map((s: any) => `${s.start}s - ${s.end}s: ${s.text}`).join('\n\n')
+                        : results.subtitles || ''
+                      }
                     />
+                    {results.styleAnalysis && (
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-medium mb-2">Style Analysis:</h4>
+                        <p className="text-sm text-muted-foreground">{results.styleAnalysis}</p>
+                      </div>
+                    )}
                   </TabsContent>
                   
                   <TabsContent value="preview" className="space-y-4">
                     <div className="h-48 p-4 border rounded-lg bg-muted overflow-y-auto">
-                      <p className="whitespace-pre-wrap">{results.subtitles}</p>
+                      {Array.isArray(results.subtitles) ? (
+                        results.subtitles.map((subtitle: any, index: number) => (
+                          <div key={index} className="mb-3 p-2 bg-background rounded">
+                            <div className="text-xs text-muted-foreground">
+                              {subtitle.start}s - {subtitle.end}s
+                            </div>
+                            <div className="text-sm">{subtitle.text}</div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="whitespace-pre-wrap">{results.subtitles}</p>
+                      )}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -265,15 +464,27 @@ const Dashboard = () => {
 
             {/* Download Buttons */}
             <div className="flex justify-center space-x-4">
-              <Button variant="outline" className="space-x-2">
+              <Button 
+                variant="outline" 
+                className="space-x-2"
+                onClick={() => handleDownload('mp4')}
+              >
                 <Download className="h-4 w-4" />
                 <span>Download MP4</span>
               </Button>
-              <Button variant="outline" className="space-x-2">
+              <Button 
+                variant="outline" 
+                className="space-x-2"
+                onClick={() => handleDownload('mov')}
+              >
                 <Download className="h-4 w-4" />
                 <span>Download MOV</span>
               </Button>
-              <Button variant="outline" className="space-x-2">
+              <Button 
+                variant="outline" 
+                className="space-x-2"
+                onClick={() => handleDownload('srt')}
+              >
                 <Download className="h-4 w-4" />
                 <span>Download SRT</span>
               </Button>

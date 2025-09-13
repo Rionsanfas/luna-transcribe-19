@@ -69,6 +69,9 @@ enabled = false
 port = 54327
 vector_port = 54328
 
+[functions.process-video-job]
+verify_jwt = true
+
 [functions.polar-webhook]
 verify_jwt = false
 
