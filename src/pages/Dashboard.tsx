@@ -7,26 +7,50 @@ import { TopNavigation } from "@/components/TopNavigation";
 
 const Dashboard = () => {
   const [activeAction, setActiveAction] = useState<"translation" | "transcription" | "style-matching">("transcription");
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [uploadedStyleImage, setUploadedStyleImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
+    if (!file) return;
+
+    // Validate file types based on active action
+    if (activeAction === "style-matching") {
+      const validImageTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif', 'image/bmp'];
+      if (!validImageTypes.includes(file.type)) {
+        alert('Please upload a valid image file (PNG, JPG, WEBP, GIF, BMP)');
+        return;
+      }
+      setUploadedStyleImage(file);
+    } else {
+      const validVideoTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo'];
+      if (!validVideoTypes.includes(file.type)) {
+        alert('Please upload a valid video file (MP4, MOV)');
+        return;
+      }
+      setUploadedVideo(file);
     }
   };
 
   const handleSendToAI = async () => {
-    if (!uploadedFile) return;
+    // Validation for style matching - requires both video and image
+    if (activeAction === "style-matching") {
+      if (!uploadedVideo || !uploadedStyleImage) {
+        alert('Style matching requires both a video file and a style reference image');
+        return;
+      }
+    } else {
+      if (!uploadedVideo) return;
+    }
     
     setIsProcessing(true);
     // Simulate AI processing
     setTimeout(() => {
       setResults({
-        videoUrl: URL.createObjectURL(uploadedFile),
-        subtitles: "Sample subtitle text would appear here..."
+        videoUrl: URL.createObjectURL(uploadedVideo!),
+        subtitles: `Sample ${activeAction} result would appear here...`
       });
       setIsProcessing(false);
     }, 2000);
@@ -104,42 +128,86 @@ const Dashboard = () => {
           <Card className="p-8">
             <div className="space-y-6">
               <h2 className="text-xl font-semibold text-center">
-                Upload Your Video for {activeAction === "transcription" ? "Transcription" : 
-                activeAction === "translation" ? "Translation" : "Style Matching"}
+                {activeAction === "style-matching" 
+                  ? "Upload Video & Style Reference" 
+                  : `Upload Your Video for ${activeAction === "transcription" ? "Transcription" : "Translation"}`
+                }
               </h2>
               
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center space-y-4">
-                <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
+              {/* Video Upload (for all actions) */}
+              <div className="border-2 border-dashed border-border rounded-lg p-6 text-center space-y-4">
+                <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
                 <div>
                   <p className="text-lg font-medium">Drop your video here or click to browse</p>
-                  <p className="text-sm text-muted-foreground">Supports MP4, MOV, AVI files up to 100MB</p>
+                  <p className="text-sm text-muted-foreground">Supports MP4, MOV files up to 100MB</p>
                 </div>
                 <input
                   type="file"
-                  accept="video/*"
+                  accept=".mp4,.mov"
                   onChange={handleFileUpload}
                   className="hidden"
-                  id="file-upload"
+                  id="video-upload"
                 />
                 <Button asChild>
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    Choose File
+                  <label htmlFor="video-upload" className="cursor-pointer">
+                    Choose Video File
                   </label>
                 </Button>
               </div>
 
-              {uploadedFile && (
+              {uploadedVideo && (
                 <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm font-medium">Selected: {uploadedFile.name}</p>
+                  <p className="text-sm font-medium">Video: {uploadedVideo.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    Size: {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                    Size: {(uploadedVideo.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
               )}
 
+              {/* Style Image Upload (only for style matching) */}
+              {activeAction === "style-matching" && (
+                <>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center space-y-4">
+                    <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <div>
+                      <p className="text-lg font-medium">Upload style reference image</p>
+                      <p className="text-sm text-muted-foreground">Supports PNG, JPG, WEBP, GIF, BMP files</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp,.gif,.bmp"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="style-upload"
+                    />
+                    <Button asChild disabled={!uploadedVideo}>
+                      <label htmlFor="style-upload" className={uploadedVideo ? "cursor-pointer" : "cursor-not-allowed"}>
+                        Choose Style Image
+                      </label>
+                    </Button>
+                    {!uploadedVideo && (
+                      <p className="text-xs text-destructive">Please upload a video first</p>
+                    )}
+                  </div>
+
+                  {uploadedStyleImage && (
+                    <div className="bg-muted p-4 rounded-lg">
+                      <p className="text-sm font-medium">Style Image: {uploadedStyleImage.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Size: {(uploadedStyleImage.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
               <Button 
                 onClick={handleSendToAI}
-                disabled={!uploadedFile || isProcessing}
+                disabled={
+                  isProcessing || 
+                  !uploadedVideo || 
+                  (activeAction === "style-matching" && !uploadedStyleImage)
+                }
                 className="w-full"
                 size="lg"
               >
