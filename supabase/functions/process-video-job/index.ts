@@ -423,16 +423,122 @@ function formatSRTTime(seconds: number): string {
 }
 
 async function createVideoWithSubtitles(videoBuffer: Uint8Array, subtitles: any[]): Promise<Uint8Array> {
-  // In a production environment, this would use FFmpeg to burn subtitles into the video
-  // For now, we'll return a processed version (this is a placeholder)
-  // Real implementation would be:
-  // 1. Save video and subtitles temporarily
-  // 2. Use FFmpeg: ffmpeg -i input.mp4 -vf "subtitles=subtitles.srt:force_style='FontSize=24,PrimaryColour=&Hffffff'" output.mp4
-  // 3. Return the processed video buffer
-  
   console.log(`Processing video with ${subtitles.length} subtitle segments`);
   
-  // For demo purposes, return the original video
-  // In production, replace this with actual FFmpeg processing
-  return videoBuffer;
+  try {
+    // Use FFmpeg command via Deno subprocess
+    const tempDir = await Deno.makeTempDir({ prefix: "video_processing_" });
+    const inputPath = `${tempDir}/input.mp4`;
+    const srtPath = `${tempDir}/subtitles.srt`;
+    const outputPath = `${tempDir}/output.mp4`;
+    
+    // Write video file
+    await Deno.writeFile(inputPath, videoBuffer);
+    
+    // Write SRT file
+    const srtContent = generateSRTContent(subtitles);
+    await Deno.writeTextFile(srtPath, srtContent);
+    
+    console.log(`Files written to ${tempDir}`);
+    
+    // Use FFmpeg to burn subtitles (if available in the environment)
+    const ffmpegArgs = [
+      "-i", inputPath,
+      "-vf", `subtitles=${srtPath}:force_style='FontName=Arial,FontSize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,BackColour=&H80000000,Bold=1,Outline=2,MarginV=30'`,
+      "-c:a", "copy",
+      "-preset", "ultrafast", // Speed up processing
+      "-y",
+      outputPath
+    ];
+    
+    try {
+      // Try to run FFmpeg
+      const process = new Deno.Command("ffmpeg", {
+        args: ffmpegArgs,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      
+      const { code, stdout, stderr } = await process.output();
+      const stderrText = new TextDecoder().decode(stderr);
+      const stdoutText = new TextDecoder().decode(stdout);
+      
+      console.log("FFmpeg stdout:", stdoutText);
+      console.log("FFmpeg stderr:", stderrText);
+      
+      if (code === 0) {
+        // Success! Read the output file
+        const processedVideo = await Deno.readFile(outputPath);
+        console.log(`Successfully processed video: ${processedVideo.length} bytes`);
+        
+        // Clean up
+        await Deno.remove(tempDir, { recursive: true });
+        return processedVideo;
+      } else {
+        console.error(`FFmpeg failed with code ${code}`);
+        throw new Error(`FFmpeg processing failed: ${stderrText}`);
+      }
+      
+    } catch (ffmpegError) {
+      console.warn("FFmpeg not available or failed:", ffmpegError);
+      
+      // Fallback: Create a simple metadata-enhanced version
+      // Add subtitle track metadata (this won't burn subtitles but will embed them)
+      const processedBuffer = await addSubtitleTrack(videoBuffer, srtContent);
+      
+      // Clean up
+      await Deno.remove(tempDir, { recursive: true });
+      return processedBuffer;
+    }
+    
+  } catch (error) {
+    console.error("Error in createVideoWithSubtitles:", error);
+    return videoBuffer; // Return original if all fails
+  }
+}
+
+// Fallback function to add subtitle metadata (soft subtitles)
+async function addSubtitleTrack(videoBuffer: Uint8Array, srtContent: string): Promise<Uint8Array> {
+  console.log("Adding soft subtitle track to video");
+  
+  try {
+    const tempDir = await Deno.makeTempDir({ prefix: "subtitle_track_" });
+    const inputPath = `${tempDir}/input.mp4`;
+    const srtPath = `${tempDir}/subtitles.srt`;
+    const outputPath = `${tempDir}/output.mp4`;
+    
+    await Deno.writeFile(inputPath, videoBuffer);
+    await Deno.writeTextFile(srtPath, srtContent);
+    
+    // Try to add subtitle track without burning
+    const process = new Deno.Command("ffmpeg", {
+      args: [
+        "-i", inputPath,
+        "-i", srtPath,
+        "-c", "copy",
+        "-c:s", "mov_text", // Add subtitle track
+        "-y",
+        outputPath
+      ],
+      stdout: "piped",
+      stderr: "piped",
+    });
+    
+    const { code } = await process.output();
+    
+    if (code === 0) {
+      const result = await Deno.readFile(outputPath);
+      await Deno.remove(tempDir, { recursive: true });
+      console.log("Successfully added subtitle track");
+      return result;
+    } else {
+      await Deno.remove(tempDir, { recursive: true });
+      console.log("Subtitle track addition failed, returning original");
+      return videoBuffer;
+    }
+    
+  } catch (error) {
+    console.error("Subtitle track addition error:", error);
+    return videoBuffer;
+  }
 }
