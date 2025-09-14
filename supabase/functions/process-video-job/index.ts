@@ -49,6 +49,10 @@ serve(async (req) => {
     const body: VideoJobRequest = await req.json();
     const { processingType, videoFile, styleImageFile, targetLanguage, originalFilename } = body;
 
+    // Convert base64 video to blob first to calculate file size
+    const videoBuffer = Uint8Array.from(atob(videoFile), c => c.charCodeAt(0));
+    const fileSizeMB = Math.round(videoBuffer.length / (1024 * 1024));
+
     // Check user token balance
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -64,7 +68,8 @@ serve(async (req) => {
     }
 
     // Calculate tokens needed based on file size (1 token = 10 MB)
-    const tokensNeeded = Math.ceil(fileSizeMB / 10 * 10) / 10; // Round to 1 decimal place
+    // Round to 1 decimal place for fractional tokens
+    const tokensNeeded = Math.ceil((fileSizeMB / 10) * 10) / 10;
     
     // Check if user has enough tokens
     if (profile.token_balance < tokensNeeded) {
@@ -77,10 +82,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Convert base64 video to blob
-    const videoBuffer = Uint8Array.from(atob(videoFile), c => c.charCodeAt(0));
-    const fileSizeMB = Math.round(videoBuffer.length / (1024 * 1024));
 
     // Create video job record
     const { data: videoJob, error: jobError } = await supabase
