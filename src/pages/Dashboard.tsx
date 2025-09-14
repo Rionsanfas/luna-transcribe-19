@@ -62,6 +62,12 @@ const Dashboard = () => {
     });
   };
 
+  const calculateTokensNeeded = (file: File | null) => {
+    if (!file) return 0;
+    const fileSizeMB = file.size / (1024 * 1024);
+    return Math.ceil(fileSizeMB / 10 * 10) / 10; // Round to 1 decimal place
+  };
+
   const handleSendToAI = async () => {
     if (!session || !user) {
       toast({
@@ -72,11 +78,13 @@ const Dashboard = () => {
       return;
     }
 
-    // Check token balance
-    if (tokenBalance < 1) {
+    const tokensNeeded = calculateTokensNeeded(uploadedVideo);
+
+    // Check token balance with calculated amount
+    if (tokenBalance < tokensNeeded) {
       toast({
         title: "Insufficient tokens",
-        description: "You need at least 1 token to process a video.",
+        description: `You need ${tokensNeeded} tokens but only have ${tokenBalance} available.`,
         variant: "destructive",
       });
       return;
@@ -169,33 +177,53 @@ const Dashboard = () => {
 
     try {
       if (format === 'srt') {
-        // Generate SRT file from subtitles
-        const srtContent = Array.isArray(results.subtitles) 
-          ? results.subtitles.map((subtitle: any, index: number) => {
-              const startTime = formatTimeForSRT(subtitle.start || index * 2);
-              const endTime = formatTimeForSRT(subtitle.end || (index + 1) * 2);
-              return `${index + 1}\n${startTime} --> ${endTime}\n${subtitle.text}\n\n`;
-            }).join('')
-          : '1\n00:00:00,000 --> 00:00:05,000\nNo subtitles available\n\n';
+        // Download SRT file from Supabase storage
+        const { data: srtData, error: srtError } = await supabase.storage
+          .from('processed-videos')
+          .download(`${results.jobId}/subtitles.srt`);
+          
+        if (srtError) {
+          // Fallback to generating SRT from results
+          const srtContent = Array.isArray(results.subtitles) 
+            ? results.subtitles.map((subtitle: any, index: number) => {
+                const startTime = formatTimeForSRT(subtitle.start || index * 2);
+                const endTime = formatTimeForSRT(subtitle.end || (index + 1) * 2);
+                return `${index + 1}\n${startTime} --> ${endTime}\n${subtitle.text}\n\n`;
+              }).join('')
+            : '1\n00:00:00,000 --> 00:00:05,000\nNo subtitles available\n\n';
 
-        const blob = new Blob([srtContent], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `subtitles.srt`;
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        // For video downloads, we'd normally get the processed video from storage
-        // For now, download the original video with a different name
-        if (uploadedVideo) {
-          const url = URL.createObjectURL(uploadedVideo);
+          const blob = new Blob([srtContent], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `processed_${uploadedVideo.name.replace(/\.[^/.]+$/, '')}.${format}`;
+          a.download = `subtitles.srt`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          // Download the actual SRT file
+          const url = URL.createObjectURL(srtData);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `subtitles.srt`;
           a.click();
           URL.revokeObjectURL(url);
         }
+      } else {
+        // Download processed video from Supabase storage
+        const { data: videoData, error: videoError } = await supabase.storage
+          .from('processed-videos')
+          .download(`${results.jobId}/processed_${uploadedVideo?.name || 'video.mp4'}`);
+          
+        if (videoError) {
+          throw new Error('Processed video not found in storage');
+        }
+        
+        const url = URL.createObjectURL(videoData);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `processed_video.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
       }
 
       toast({
@@ -203,6 +231,7 @@ const Dashboard = () => {
         description: `Your ${format.toUpperCase()} file is being downloaded.`,
       });
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         title: "Download failed",
         description: "There was an error downloading the file.",
@@ -380,7 +409,7 @@ const Dashboard = () => {
                   isProcessing || 
                   !uploadedVideo || 
                   (activeAction === "style-matching" && !uploadedStyleImage) ||
-                  tokenBalance < 1
+                  tokenBalance < calculateTokensNeeded(uploadedVideo)
                 }
                 className="w-full"
                 size="lg"
@@ -390,7 +419,9 @@ const Dashboard = () => {
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                     {jobStatus || "Processing..."}
                   </div>
-                ) : tokenBalance < 1 ? "Insufficient Tokens" : "Send to AI (1 token)"}
+                ) : tokenBalance < calculateTokensNeeded(uploadedVideo) 
+                  ? "Insufficient Tokens" 
+                  : `Send to AI (${calculateTokensNeeded(uploadedVideo)} tokens)`}
               </Button>
             </div>
           </Card>
