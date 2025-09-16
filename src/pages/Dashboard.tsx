@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Upload, Play, Download, FileText, Languages, Palette } from "lucide-react";
+import { Upload, Play, Download, FileText, Languages, Palette, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,8 @@ const Dashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
+  const [editedSubtitles, setEditedSubtitles] = useState<string>('');
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -143,10 +146,20 @@ const Dashboard = () => {
       if (data.success) {
         setResults({
           jobId: data.jobId,
-          videoUrl: URL.createObjectURL(uploadedVideo),
+          videoUrl: data.result?.processedVideoUrl || URL.createObjectURL(uploadedVideo),
+          originalVideoUrl: URL.createObjectURL(uploadedVideo),
           subtitles: data.result?.subtitles || [],
-          styleAnalysis: data.result?.styleAnalysis
+          styleAnalysis: data.result?.styleAnalysis,
+          srtUrl: data.result?.srtUrl
         });
+
+        // Set initial edited subtitles
+        if (data.result?.subtitles) {
+          const subtitleText = Array.isArray(data.result.subtitles) 
+            ? data.result.subtitles.map((s: any) => `${s.start} --> ${s.end}\n${s.text}`).join('\n\n')
+            : data.result.subtitles;
+          setEditedSubtitles(subtitleText);
+        }
 
         // Refresh token balance
         await refreshTokenBalance();
@@ -172,8 +185,89 @@ const Dashboard = () => {
     }
   };
 
+  const handleReprocessSubtitles = async () => {
+    if (!editedSubtitles || !results?.jobId) return;
+
+    setIsReprocessing(true);
+    try {
+      // Parse edited subtitles back to structured format
+      const subtitleLines = editedSubtitles.split('\n\n');
+      const parsedSubtitles = subtitleLines.map((block, index) => {
+        const lines = block.trim().split('\n');
+        if (lines.length >= 2) {
+          const timeLine = lines[0];
+          const textLines = lines.slice(1).join(' ');
+          
+          // Parse time format (start --> end)
+          const timeMatch = timeLine.match(/(\d+\.?\d*)\s*-->\s*(\d+\.?\d*)/);
+          if (timeMatch) {
+            return {
+              start: parseFloat(timeMatch[1]),
+              end: parseFloat(timeMatch[2]),
+              text: textLines
+            };
+          }
+        }
+        return {
+          start: index * 2,
+          end: (index + 1) * 2,
+          text: block.trim()
+        };
+      }).filter(sub => sub.text.length > 0);
+
+      // Update subtitles in the database
+      await supabase
+        .from('video_subtitles')
+        .delete()
+        .eq('video_job_id', results.jobId);
+
+      const subtitleInserts = parsedSubtitles.map((subtitle) => ({
+        video_job_id: results.jobId,
+        start_time: subtitle.start,
+        end_time: subtitle.end,
+        text: subtitle.text,
+        manual_edit: true,
+        confidence: 1.0,
+      }));
+
+      await supabase
+        .from('video_subtitles')
+        .insert(subtitleInserts);
+
+      // Call reprocessing edge function to regenerate video with new subtitles
+      const { data: reprocessData, error: reprocessError } = await supabase.functions.invoke('reprocess-subtitles', {
+        body: { jobId: results.jobId }
+      });
+
+      if (reprocessError) {
+        throw reprocessError;
+      }
+
+      // Update results with new URLs and subtitles
+      setResults(prev => ({
+        ...prev,
+        subtitles: parsedSubtitles,
+        videoUrl: reprocessData.processedVideoUrl,
+        srtUrl: reprocessData.srtUrl
+      }));
+
+      toast({
+        title: "Subtitles updated!",
+        description: "Your subtitle edits have been applied to the video successfully.",
+      });
+    } catch (error: any) {
+      console.error('Reprocessing error:', error);
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update subtitles.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
+
   const handleDownload = async (format: 'mp4' | 'mov' | 'srt') => {
-    if (!results?.jobId) return;
 
     try {
       if (format === 'srt') {
@@ -416,7 +510,7 @@ const Dashboard = () => {
               >
                 {isProcessing ? (
                   <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                     {jobStatus || "Processing..."}
                   </div>
                 ) : tokenBalance < calculateTokensNeeded(uploadedVideo) 
@@ -435,7 +529,7 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Video Preview */}
               <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Video Preview</h3>
+                <h3 className="text-lg font-semibold mb-4">Processed Video</h3>
                 <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
                   <video
                     src={results.videoUrl}
@@ -445,6 +539,20 @@ const Dashboard = () => {
                     Your browser does not support the video tag.
                   </video>
                 </div>
+                {results.originalVideoUrl && results.videoUrl !== results.originalVideoUrl && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium mb-2">Original Video (for comparison)</h4>
+                    <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
+                      <video
+                        src={results.originalVideoUrl}
+                        controls
+                        className="w-full h-full rounded-lg"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  </div>
+                )}
               </Card>
 
               {/* Editor Panel */}
@@ -457,14 +565,29 @@ const Dashboard = () => {
                   </TabsList>
                   
                   <TabsContent value="edit" className="space-y-4">
-                    <textarea
-                      className="w-full h-48 p-4 border rounded-lg resize-none bg-background"
+                    <Textarea
+                      className="h-48 resize-none"
                       placeholder="Subtitles will appear here for editing..."
-                      defaultValue={Array.isArray(results.subtitles) 
-                        ? results.subtitles.map((s: any) => `${s.start}s - ${s.end}s: ${s.text}`).join('\n\n')
-                        : results.subtitles || ''
-                      }
+                      value={editedSubtitles}
+                      onChange={(e) => setEditedSubtitles(e.target.value)}
                     />
+                    <Button 
+                      onClick={handleReprocessSubtitles}
+                      disabled={isReprocessing || !editedSubtitles.trim()}
+                      className="w-full"
+                    >
+                      {isReprocessing ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                          Updating Subtitles...
+                        </div>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Apply Changes
+                        </>
+                      )}
+                    </Button>
                     {results.styleAnalysis && (
                       <div className="p-4 bg-muted rounded-lg">
                         <h4 className="font-medium mb-2">Style Analysis:</h4>

@@ -219,11 +219,25 @@ serve(async (req) => {
           description: `${processingType} processing (${fileSizeMB}MB)`
         });
 
+      // Get the processed video URL
+      const { data: processedVideoUrl } = supabase.storage
+        .from('processed-videos')
+        .getPublicUrl(processedFileName);
+
+      // Get the SRT file URL  
+      const { data: srtUrl } = supabase.storage
+        .from('processed-videos')
+        .getPublicUrl(srtFileName);
+
       return new Response(JSON.stringify({
         success: true,
         jobId: videoJob.id,
         status: 'completed',
-        result: result
+        result: {
+          ...result,
+          processedVideoUrl: processedVideoUrl.publicUrl,
+          srtUrl: srtUrl.publicUrl
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -303,42 +317,47 @@ async function processTranslation(videoBuffer: Uint8Array, targetLanguage: strin
     throw new Error('OpenAI API key not configured');
   }
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a professional translator. Translate the following subtitles to ${targetLanguage}. Maintain the same timing and structure. Return only the translated text for each subtitle segment.`
-        },
-        {
-          role: 'user',
-          content: `Translate these subtitles: ${JSON.stringify(transcription.subtitles)}`
-        }
-      ],
-      max_tokens: 2000,
-      temperature: 0.1
-    }),
-  });
+  // Translate each subtitle segment individually for better accuracy
+  const translatedSubtitles = [];
+  
+  for (const subtitle of transcription.subtitles) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional translator. Translate the text to ${targetLanguage}. Return only the translated text, nothing else.`
+          },
+          {
+            role: 'user',
+            content: subtitle.text
+          }
+        ],
+        max_tokens: 500,
+        temperature: 0.1
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI translation failed: ${error}`);
+    if (!response.ok) {
+      console.warn(`Translation failed for segment: ${subtitle.text}`);
+      translatedSubtitles.push(subtitle); // Keep original if translation fails
+      continue;
+    }
+
+    const result = await response.json();
+    const translatedText = result.choices[0].message.content.trim();
+
+    translatedSubtitles.push({
+      ...subtitle,
+      text: translatedText
+    });
   }
-
-  const result = await response.json();
-  const translatedText = result.choices[0].message.content;
-
-  // Parse the translated result and map back to original timing
-  const translatedSubtitles = transcription.subtitles.map((subtitle: any, index: number) => ({
-    ...subtitle,
-    text: `Translated: ${subtitle.text}` // Simplified - in real implementation, parse the AI response
-  }));
 
   return {
     subtitles: translatedSubtitles
