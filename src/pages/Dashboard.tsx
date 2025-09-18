@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [jobStatus, setJobStatus] = useState<string>('');
   const [editedSubtitles, setEditedSubtitles] = useState<string>('');
   const [isReprocessing, setIsReprocessing] = useState(false);
+  const [showSubtitleEditor, setShowSubtitleEditor] = useState(false);
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -153,12 +154,13 @@ const Dashboard = () => {
           srtUrl: data.result?.srtUrl
         });
 
-        // Set initial edited subtitles
-        if (data.result?.subtitles) {
-          const subtitleText = Array.isArray(data.result.subtitles) 
-            ? data.result.subtitles.map((s: any) => `${s.start} --> ${s.end}\n${s.text}`).join('\n\n')
-            : data.result.subtitles;
+        // Set initial edited subtitles with proper formatting
+        if (data.result?.subtitles && Array.isArray(data.result.subtitles)) {
+          const subtitleText = data.result.subtitles.map((s: any) => 
+            `${formatTimeForEdit(s.start)} --> ${formatTimeForEdit(s.end)}\n${s.text}`
+          ).join('\n\n');
           setEditedSubtitles(subtitleText);
+          setShowSubtitleEditor(true);
         }
 
         // Refresh token balance
@@ -185,81 +187,53 @@ const Dashboard = () => {
     }
   };
 
-  const handleReprocessSubtitles = async () => {
+  const handleApplyChanges = async () => {
     if (!editedSubtitles || !results?.jobId) return;
 
     setIsReprocessing(true);
     try {
-      // Parse edited subtitles back to structured format
-      const subtitleLines = editedSubtitles.split('\n\n');
-      const parsedSubtitles = subtitleLines.map((block, index) => {
-        const lines = block.trim().split('\n');
-        if (lines.length >= 2) {
-          const timeLine = lines[0];
-          const textLines = lines.slice(1).join(' ');
-          
-          // Parse time format (start --> end)
-          const timeMatch = timeLine.match(/(\d+\.?\d*)\s*-->\s*(\d+\.?\d*)/);
-          if (timeMatch) {
-            return {
-              start: parseFloat(timeMatch[1]),
-              end: parseFloat(timeMatch[2]),
-              text: textLines
-            };
-          }
-        }
-        return {
-          start: index * 2,
-          end: (index + 1) * 2,
-          text: block.trim()
-        };
-      }).filter(sub => sub.text.length > 0);
+      toast({
+        title: "Re-timing subtitles...",
+        description: "Using AI to sync your edited text with the audio. This may take a moment.",
+      });
 
-      // Update subtitles in the database
-      await supabase
-        .from('video_subtitles')
-        .delete()
-        .eq('video_job_id', results.jobId);
+      // Extract just the text content for re-timing (remove timing info)
+      const textOnlyContent = editedSubtitles
+        .split('\n\n')
+        .map(block => {
+          const lines = block.trim().split('\n');
+          // Skip timing line, keep only text
+          return lines.length > 1 ? lines.slice(1).join(' ') : lines[0];
+        })
+        .filter(text => text.trim().length > 0)
+        .join('\n');
 
-      const subtitleInserts = parsedSubtitles.map((subtitle) => ({
-        video_job_id: results.jobId,
-        start_time: subtitle.start,
-        end_time: subtitle.end,
-        text: subtitle.text,
-        manual_edit: true,
-        confidence: 1.0,
-      }));
+      console.log('Sending text for re-timing:', textOnlyContent);
 
-      await supabase
-        .from('video_subtitles')
-        .insert(subtitleInserts);
-
-      // Call reprocessing edge function to regenerate video with new subtitles
+      // Call reprocessing edge function with edited text for re-timing
       const { data: reprocessData, error: reprocessError } = await supabase.functions.invoke('reprocess-subtitles', {
-        body: { jobId: results.jobId }
+        body: { 
+          jobId: results.jobId,
+          editedText: textOnlyContent
+        }
       });
 
       if (reprocessError) {
         throw reprocessError;
       }
 
-      // Update results with new URLs and subtitles
-      setResults(prev => ({
-        ...prev,
-        subtitles: parsedSubtitles,
-        processedVideoUrl: reprocessData.processedVideoUrl,
-        srtUrl: reprocessData.srtUrl
-      }));
+      // Refresh the page to show updated video
+      window.location.reload();
 
       toast({
-        title: "Subtitles updated!",
-        description: "Your subtitle edits have been applied to the video successfully.",
+        title: "Subtitles re-timed!",
+        description: "Your edits have been synced with the audio and burned into the video.",
       });
     } catch (error: any) {
       console.error('Reprocessing error:', error);
       toast({
-        title: "Update failed",
-        description: error.message || "Failed to update subtitles.",
+        title: "Re-timing failed",
+        description: error.message || "Failed to re-time subtitles with audio.",
         variant: "destructive",
       });
     } finally {
@@ -341,6 +315,10 @@ const Dashboard = () => {
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 1000);
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+  };
+
+  const formatTimeForEdit = (seconds: number) => {
+    return `${seconds.toFixed(2)}s`;
   };
 
   if (!user) {
@@ -578,11 +556,11 @@ const Dashboard = () => {
                       value={editedSubtitles}
                       onChange={(e) => setEditedSubtitles(e.target.value)}
                     />
-                    <Button 
-                      onClick={handleReprocessSubtitles}
-                      disabled={isReprocessing || !editedSubtitles.trim()}
-                      className="w-full"
-                    >
+                     <Button 
+                       onClick={handleApplyChanges}
+                       disabled={isReprocessing || !editedSubtitles.trim()}
+                       className="w-full"
+                     >
                       {isReprocessing ? (
                         <div className="flex items-center gap-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>

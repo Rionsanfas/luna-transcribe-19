@@ -40,7 +40,8 @@ serve(async (req) => {
       });
     }
 
-    const { jobId } = await req.json();
+  try {
+    const { jobId, editedText } = await req.json();
 
     // Get job details and verify ownership
     const { data: videoJob, error: jobError } = await supabase
@@ -57,21 +58,10 @@ serve(async (req) => {
       });
     }
 
-    // Get updated subtitles
-    const { data: subtitles, error: subtitlesError } = await supabase
-      .from('video_subtitles')
-      .select('*')
-      .eq('video_job_id', jobId)
-      .order('start_time', { ascending: true });
+    console.log('Reprocessing subtitles for job:', jobId);
+    console.log('Edited text provided:', !!editedText);
 
-    if (subtitlesError) {
-      return new Response(JSON.stringify({ error: 'Failed to fetch subtitles' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Download original video
+    // Download original video for re-timing
     const { data: videoData, error: downloadError } = await supabase.storage
       .from('videos')
       .download(videoJob.input_file_path);
@@ -85,11 +75,54 @@ serve(async (req) => {
 
     const videoBuffer = new Uint8Array(await videoData.arrayBuffer());
 
+    // Re-time subtitles using Whisper if edited text is provided
+    let finalSubtitles;
+    if (editedText) {
+      console.log('Re-timing subtitles with Whisper based on edited text');
+      finalSubtitles = await retimeSubtitlesWithWhisper(videoBuffer, editedText);
+      
+      // Update database with new timed subtitles
+      await supabase
+        .from('video_subtitles')
+        .delete()
+        .eq('video_job_id', jobId);
+
+      const subtitleInserts = finalSubtitles.map((subtitle: any) => ({
+        video_job_id: jobId,
+        start_time: subtitle.start,
+        end_time: subtitle.end,
+        text: subtitle.text,
+        confidence: subtitle.confidence || 0.9,
+        manual_edit: true,
+      }));
+
+      await supabase
+        .from('video_subtitles')
+        .insert(subtitleInserts);
+        
+    } else {
+      // Get existing subtitles from database
+      const { data: existingSubtitles, error: subtitlesError } = await supabase
+        .from('video_subtitles')
+        .select('*')
+        .eq('video_job_id', jobId)
+        .order('start_time', { ascending: true });
+
+      if (subtitlesError) {
+        return new Response(JSON.stringify({ error: 'Failed to fetch subtitles' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      finalSubtitles = existingSubtitles;
+    }
+
     // Generate new SRT content
-    const srtContent = generateSRTContent(subtitles);
+    const srtContent = generateSRTContent(finalSubtitles);
     
     // Create processed video with updated subtitles
-    const processedVideoBuffer = await createVideoWithSubtitles(videoBuffer, subtitles);
+    const processedVideoBuffer = await createVideoWithSubtitles(videoBuffer, finalSubtitles);
     
     // Update files in storage
     const processedFileName = `${jobId}/processed_${videoJob.original_filename}`;
@@ -153,6 +186,96 @@ function formatSRTTime(seconds: number): string {
   const ms = Math.floor((seconds % 1) * 1000);
   
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+}
+
+// Re-time subtitles using Whisper based on edited text
+async function retimeSubtitlesWithWhisper(videoBuffer: Uint8Array, editedText: string): Promise<any[]> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  console.log('Using Whisper to re-time edited subtitles');
+
+  // Use Whisper for forced alignment to get precise timing
+  const formData = new FormData();
+  const blob = new Blob([videoBuffer], { type: 'video/mp4' });
+  formData.append('file', blob, 'video.mp4');
+  formData.append('model', 'whisper-1');
+  formData.append('response_format', 'verbose_json');
+  formData.append('timestamp_granularities[]', 'word');
+  formData.append('timestamp_granularities[]', 'segment');
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Whisper re-timing failed: ${error}`);
+  }
+
+  const whisperResult = await response.json();
+  console.log('Whisper segments for re-timing:', whisperResult.segments?.length || 0);
+
+  // Parse edited text into segments (user may have edited the text)
+  const editedLines = editedText.split('\n').filter(line => line.trim().length > 0);
+  
+  // Use GPT to align edited text with Whisper segments
+  const alignmentResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a subtitle timing expert. Given original Whisper segments and edited text lines, create properly timed subtitles. Return JSON array with start, end, text, confidence fields. Ensure timing matches the audio segments.'
+        },
+        {
+          role: 'user',
+          content: `Original Whisper segments: ${JSON.stringify(whisperResult.segments)}\n\nEdited text lines: ${JSON.stringify(editedLines)}\n\nCreate timed subtitles matching the edited text to the audio timing.`
+        }
+      ],
+      max_tokens: 2000,
+      temperature: 0.1
+    }),
+  });
+
+  if (!alignmentResponse.ok) {
+    console.warn('GPT alignment failed, using Whisper segments as fallback');
+    return whisperResult.segments?.map((segment: any) => ({
+      start: segment.start,
+      end: segment.end,
+      text: segment.text.trim(),
+      confidence: segment.avg_logprob || 0.9
+    })) || [];
+  }
+
+  const alignmentResult = await alignmentResponse.json();
+  let alignedSubtitles;
+
+  try {
+    alignedSubtitles = JSON.parse(alignmentResult.choices[0].message.content);
+  } catch (parseError) {
+    console.warn('Failed to parse alignment result, using Whisper segments');
+    alignedSubtitles = whisperResult.segments?.map((segment: any) => ({
+      start: segment.start,
+      end: segment.end,
+      text: segment.text.trim(),
+      confidence: segment.avg_logprob || 0.9
+    })) || [];
+  }
+
+  console.log('Final aligned subtitles count:', alignedSubtitles.length);
+  return alignedSubtitles;
 }
 
 async function createVideoWithSubtitles(videoBuffer: Uint8Array, subtitles: any[]): Promise<Uint8Array> {

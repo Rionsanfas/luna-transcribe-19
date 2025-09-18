@@ -280,6 +280,8 @@ async function processTranscription(videoBuffer: Uint8Array) {
     throw new Error('OpenAI API key not configured');
   }
 
+  console.log('Starting Whisper transcription with word-level timestamps');
+
   // Extract audio from video and send to OpenAI Whisper
   const formData = new FormData();
   const blob = new Blob([videoBuffer], { type: 'video/mp4' });
@@ -287,6 +289,7 @@ async function processTranscription(videoBuffer: Uint8Array) {
   formData.append('model', 'whisper-1');
   formData.append('response_format', 'verbose_json');
   formData.append('timestamp_granularities[]', 'word');
+  formData.append('timestamp_granularities[]', 'segment');
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -302,14 +305,32 @@ async function processTranscription(videoBuffer: Uint8Array) {
   }
 
   const result = await response.json();
+  console.log('Whisper response segments count:', result.segments?.length || 0);
+  
+  // Convert segments to properly timed subtitles
+  const subtitles = result.segments?.map((segment: any) => ({
+    start: segment.start,
+    end: segment.end,
+    text: segment.text.trim(),
+    confidence: segment.avg_logprob || 0.9,
+    words: segment.words || []
+  })) || [];
+
+  // If no segments, create a fallback
+  if (subtitles.length === 0 && result.text) {
+    subtitles.push({
+      start: 0,
+      end: Math.min(result.duration || 5, 5),
+      text: result.text.trim(),
+      confidence: 0.9,
+      words: []
+    });
+  }
+
+  console.log('Generated subtitles count:', subtitles.length);
   
   return {
-    subtitles: result.segments || [{
-      start: 0,
-      end: 5,
-      text: result.text || 'Transcription completed',
-      confidence: 0.9
-    }]
+    subtitles: subtitles
   };
 }
 
