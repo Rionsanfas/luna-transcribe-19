@@ -1,6 +1,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { FFmpeg } from "https://esm.sh/@ffmpeg/ffmpeg@0.12.7";
+import { fetchFile, toBlobURL } from "https://esm.sh/@ffmpeg/util@0.12.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,66 +156,70 @@ function formatSRTTime(seconds: number): string {
 }
 
 async function createVideoWithSubtitles(videoBuffer: Uint8Array, subtitles: any[]): Promise<Uint8Array> {
-  console.log(`Reprocessing video with ${subtitles.length} subtitle segments`);
+  console.log(`Reprocessing video with ${subtitles.length} subtitle segments using FFmpeg WASM`);
   
   try {
-    // Use FFmpeg command via Deno subprocess
-    const tempDir = await Deno.makeTempDir({ prefix: "subtitle_reprocess_" });
-    const inputPath = `${tempDir}/input.mp4`;
-    const srtPath = `${tempDir}/subtitles.srt`;
-    const outputPath = `${tempDir}/output.mp4`;
+    // Initialize FFmpeg WASM
+    const ffmpeg = new FFmpeg();
     
-    // Write video file
-    await Deno.writeFile(inputPath, videoBuffer);
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd';
+    ffmpeg.on('log', ({ message }) => {
+      console.log('FFmpeg Log:', message);
+    });
     
-    // Write SRT file
+    // Load FFmpeg
+    await ffmpeg.load({
+      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    });
+    
+    // Write input video to FFmpeg virtual filesystem
+    await ffmpeg.writeFile('input.mp4', await fetchFile(new Blob([videoBuffer])));
+    
+    // Generate SRT content and write to filesystem
     const srtContent = generateSRTContent(subtitles);
-    await Deno.writeTextFile(srtPath, srtContent);
+    await ffmpeg.writeFile('subtitles.srt', srtContent);
     
-    console.log(`Files written to ${tempDir}`);
+    // Use default subtitle styling for reprocessing
+    const subtitleFilter = `subtitles=subtitles.srt:force_style='FontName=Arial,FontSize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,BackColour=&H80000000,Bold=1,Outline=2,MarginV=30'`;
     
-    // Use FFmpeg to burn subtitles
-    const ffmpegArgs = [
-      "-i", inputPath,
-      "-vf", `subtitles=${srtPath}:force_style='FontName=Arial,FontSize=24,PrimaryColour=&Hffffff,OutlineColour=&H000000,BackColour=&H80000000,Bold=1,Outline=2,MarginV=30'`,
-      "-c:a", "copy",
-      "-preset", "ultrafast",
-      "-y",
-      outputPath
-    ];
+    // Run FFmpeg to burn subtitles
+    await ffmpeg.exec([
+      '-i', 'input.mp4',
+      '-vf', subtitleFilter,
+      '-c:a', 'copy',
+      '-preset', 'ultrafast',
+      '-y',
+      'output.mp4'
+    ]);
     
-    try {
-      const process = new Deno.Command("ffmpeg", {
-        args: ffmpegArgs,
-        stdout: "piped",
-        stderr: "piped",
-      });
-      
-      const { code, stderr } = await process.output();
-      const stderrText = new TextDecoder().decode(stderr);
-      
-      if (code === 0) {
-        const processedVideo = await Deno.readFile(outputPath);
-        console.log(`Successfully processed video: ${processedVideo.length} bytes`);
-        
-        // Clean up
-        await Deno.remove(tempDir, { recursive: true });
-        return processedVideo;
-      } else {
-        console.error(`FFmpeg failed with code ${code}: ${stderrText}`);
-        throw new Error(`FFmpeg processing failed: ${stderrText}`);
-      }
-      
-    } catch (ffmpegError) {
-      console.warn("FFmpeg not available or failed:", ffmpegError);
-      
-      // Clean up
-      await Deno.remove(tempDir, { recursive: true });
-      return videoBuffer; // Return original if FFmpeg fails
+    // Read the processed video
+    const data = await ffmpeg.readFile('output.mp4');
+    const processedVideo = new Uint8Array(data as ArrayBuffer);
+    
+    // Validate video output
+    const isValid = await validateVideoOutput(ffmpeg, 'output.mp4');
+    if (!isValid) {
+      console.error('Generated video is invalid, falling back to original');
+      return videoBuffer;
     }
+    
+    console.log(`Successfully reprocessed video: ${processedVideo.length} bytes`);
+    return processedVideo;
     
   } catch (error) {
     console.error("Error in createVideoWithSubtitles:", error);
     return videoBuffer; // Return original if all fails
+  }
+}
+
+// Validate video output using FFmpeg probe
+async function validateVideoOutput(ffmpeg: FFmpeg, filename: string): Promise<boolean> {
+  try {
+    await ffmpeg.exec(['-i', filename, '-f', 'null', '-']);
+    return true;
+  } catch (error) {
+    console.error('Video validation failed:', error);
+    return false;
   }
 }

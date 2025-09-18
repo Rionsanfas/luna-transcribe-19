@@ -247,7 +247,7 @@ const Dashboard = () => {
       setResults(prev => ({
         ...prev,
         subtitles: parsedSubtitles,
-        videoUrl: reprocessData.processedVideoUrl,
+        processedVideoUrl: reprocessData.processedVideoUrl,
         srtUrl: reprocessData.srtUrl
       }));
 
@@ -529,17 +529,24 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Video Preview */}
               <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Processed Video</h3>
+                <h3 className="text-lg font-semibold mb-4">Processed Video with Burned Subtitles</h3>
                 <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
                   <video
-                    src={results.videoUrl}
+                    src={results.processedVideoUrl || results.videoUrl}
                     controls
                     className="w-full h-full rounded-lg"
+                    onLoadedData={(e) => {
+                      const video = e.currentTarget;
+                      console.log(`Video loaded: ${video.duration}s duration, ${video.videoWidth}x${video.videoHeight}`);
+                    }}
+                    onError={(e) => {
+                      console.error('Video playback error:', e);
+                    }}
                   >
                     Your browser does not support the video tag.
                   </video>
                 </div>
-                {results.originalVideoUrl && results.videoUrl !== results.originalVideoUrl && (
+                {results.originalVideoUrl && results.processedVideoUrl !== results.originalVideoUrl && (
                   <div className="mt-4">
                     <h4 className="text-sm font-medium mb-2">Original Video (for comparison)</h4>
                     <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
