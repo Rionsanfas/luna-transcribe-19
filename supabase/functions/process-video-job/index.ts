@@ -343,6 +343,33 @@ async function processTranslation(videoBuffer: Uint8Array, targetLanguage: strin
     throw new Error('OpenAI API key not configured');
   }
 
+  // Language code to full name mapping
+  const languageMap: Record<string, string> = {
+    'es': 'Spanish',
+    'fr': 'French', 
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'zh': 'Chinese',
+    'ar': 'Arabic',
+    'hi': 'Hindi',
+    'th': 'Thai',
+    'vi': 'Vietnamese',
+    'nl': 'Dutch',
+    'sv': 'Swedish',
+    'no': 'Norwegian',
+    'da': 'Danish',
+    'fi': 'Finnish',
+    'pl': 'Polish',
+    'cs': 'Czech',
+    'tr': 'Turkish'
+  };
+
+  const targetLanguageName = languageMap[targetLanguage] || targetLanguage;
+
   // Translate each subtitle segment individually for better accuracy
   const translatedSubtitles = [];
   
@@ -358,7 +385,7 @@ async function processTranslation(videoBuffer: Uint8Array, targetLanguage: strin
         messages: [
           {
             role: 'system',
-            content: `You are a professional translator. Translate the text to ${targetLanguage}. Return only the translated text, nothing else.`
+            content: `You are a professional translator. Translate the text to ${targetLanguageName}. Return only the translated text, nothing else. Preserve the timing and flow appropriate for subtitles.`
           },
           {
             role: 'user',

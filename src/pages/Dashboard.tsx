@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +25,7 @@ const Dashboard = () => {
   const [editedSubtitles, setEditedSubtitles] = useState<string>('');
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [showSubtitleEditor, setShowSubtitleEditor] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState<string>('es');
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -135,7 +137,7 @@ const Dashboard = () => {
           processingType: activeAction,
           videoFile: videoBase64,
           styleImageFile: styleImageBase64,
-          targetLanguage: activeAction === 'translation' ? 'Spanish' : undefined,
+          targetLanguage: activeAction === 'translation' ? targetLanguage : undefined,
           originalFilename: uploadedVideo.name
         }
       });
@@ -380,7 +382,7 @@ const Dashboard = () => {
               id="transcription"
               icon={FileText}
               title="Transcription"
-              description="Convert speech to text subtitles"
+              description="Generate subtitles from video audio"
               isActive={activeAction === "transcription"}
               onClick={() => setActiveAction("transcription")}
             />
@@ -388,7 +390,7 @@ const Dashboard = () => {
               id="translation"
               icon={Languages}
               title="Translation"
-              description="Translate subtitles to other languages"
+              description="Generate subtitles in different languages"
               isActive={activeAction === "translation"}
               onClick={() => setActiveAction("translation")}
             />
@@ -410,7 +412,7 @@ const Dashboard = () => {
               <h2 className="text-xl font-semibold text-center">
                 {activeAction === "style-matching" 
                   ? "Upload Video & Style Reference" 
-                  : `Upload Your Video for ${activeAction === "transcription" ? "Transcription" : "Translation"}`
+                  : `Upload Your Video for AI Subtitle Generation`
                 }
               </h2>
               
@@ -481,6 +483,41 @@ const Dashboard = () => {
                 </>
               )}
 
+              {/* Language Selection for Translation */}
+              {activeAction === "translation" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Target Language</label>
+                  <Select value={targetLanguage} onValueChange={setTargetLanguage}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select target language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="es">Spanish</SelectItem>
+                      <SelectItem value="fr">French</SelectItem>
+                      <SelectItem value="de">German</SelectItem>
+                      <SelectItem value="it">Italian</SelectItem>
+                      <SelectItem value="pt">Portuguese</SelectItem>
+                      <SelectItem value="ru">Russian</SelectItem>
+                      <SelectItem value="ja">Japanese</SelectItem>
+                      <SelectItem value="ko">Korean</SelectItem>
+                      <SelectItem value="zh">Chinese</SelectItem>
+                      <SelectItem value="ar">Arabic</SelectItem>
+                      <SelectItem value="hi">Hindi</SelectItem>
+                      <SelectItem value="th">Thai</SelectItem>
+                      <SelectItem value="vi">Vietnamese</SelectItem>
+                      <SelectItem value="nl">Dutch</SelectItem>
+                      <SelectItem value="sv">Swedish</SelectItem>
+                      <SelectItem value="no">Norwegian</SelectItem>             
+                      <SelectItem value="da">Danish</SelectItem>
+                      <SelectItem value="fi">Finnish</SelectItem>
+                      <SelectItem value="pl">Polish</SelectItem>
+                      <SelectItem value="cs">Czech</SelectItem>
+                      <SelectItem value="tr">Turkish</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <Button 
                 onClick={handleSendToAI}
                 disabled={
@@ -499,7 +536,7 @@ const Dashboard = () => {
                   </div>
                 ) : tokenBalance < calculateTokensNeeded(uploadedVideo) 
                   ? "Insufficient Tokens" 
-                  : `Send to AI (${calculateTokensNeeded(uploadedVideo)} tokens)`}
+                  : `Generate AI Subtitles (${calculateTokensNeeded(uploadedVideo)} tokens)`}
               </Button>
             </div>
           </Card>
