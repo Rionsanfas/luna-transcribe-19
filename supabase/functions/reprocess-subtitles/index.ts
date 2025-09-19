@@ -40,7 +40,6 @@ serve(async (req) => {
       });
     }
 
-  try {
     const { jobId, editedText } = await req.json();
 
     // Get job details and verify ownership
