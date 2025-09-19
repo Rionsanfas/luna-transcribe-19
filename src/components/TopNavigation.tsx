@@ -88,13 +88,22 @@ export const TopNavigation = () => {
                     Pricing
                   </a>
                   {user && (
-                    <Link 
-                      to="/dashboard" 
-                      className="block text-base py-3 px-2 rounded-md hover:bg-accent transition-colors"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
+                    <>
+                     <Link 
+                       to="/dashboard" 
+                       className="block text-base py-3 px-2 rounded-md hover:bg-accent transition-colors"
+                       onClick={() => setIsMobileMenuOpen(false)}
+                     >
+                       Dashboard
+                     </Link>
+                     <Link 
+                       to="/history" 
+                       className="block text-base py-3 px-2 rounded-md hover:bg-accent transition-colors"
+                       onClick={() => setIsMobileMenuOpen(false)}
+                     >
+                       History
+                     </Link>
+                    </>
                   )}
                   {!user && (
                     <div className="space-y-3 pt-4">
@@ -124,11 +133,18 @@ export const TopNavigation = () => {
               Pricing
             </a>
             {user && (
-              <Link to="/dashboard" className={`text-sm transition-colors hover:scale-105 ${
-                isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}>
-                Dashboard
-              </Link>
+              <>
+                <Link to="/dashboard" className={`text-sm transition-colors hover:scale-105 ${
+                  isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                  Dashboard
+                </Link>
+                <Link to="/history" className={`text-sm transition-colors hover:scale-105 ${
+                  isScrolled ? 'text-card-foreground/90 hover:text-card-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}>
+                  History
+                </Link>
+              </>
             )}
           </div>
 
@@ -186,6 +202,9 @@ export const TopNavigation = () => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link to="/dashboard">Dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/history">History</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link to="/settings">Settings</Link>

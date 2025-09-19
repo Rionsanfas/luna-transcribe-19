@@ -222,11 +222,17 @@ const Dashboard = () => {
         throw reprocessError;
       }
 
-      // Refresh the page to show updated video
-      window.location.reload();
+      // Update results with the new processed video
+      if (reprocessData?.processedVideoUrl) {
+        setResults(prevResults => ({
+          ...prevResults,
+          processedVideoUrl: reprocessData.processedVideoUrl,
+          videoUrl: reprocessData.processedVideoUrl,
+        }));
+      }
 
       toast({
-        title: "Subtitles re-timed!",
+        title: "✅ Your captions were applied and the video was saved to your History.",
         description: "Your edits have been synced with the audio and burned into the video.",
       });
     } catch (error: any) {
