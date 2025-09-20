@@ -11,12 +11,8 @@ const Index = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  useEffect(() => {
-    // Redirect authenticated users to dashboard
-    if (!loading && user) {
-      navigate("/dashboard");
-    }
-  }, [user, loading, navigate]);
+  // Don't auto-redirect authenticated users anymore
+  // Let them access the home page if they want
 
   // Show loading state while checking auth
   if (loading) {
@@ -27,10 +23,7 @@ const Index = () => {
     );
   }
 
-  // Only show landing page if user is not authenticated
-  if (user) {
-    return null; // Will redirect to dashboard
-  }
+  // Show landing page for both authenticated and non-authenticated users
 
   return (
     <div className="min-h-screen bg-background">

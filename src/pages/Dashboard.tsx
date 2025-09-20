@@ -144,7 +144,8 @@ const Dashboard = () => {
       if (data.success) {
         setResults({
           jobId: data.jobId,
-          videoUrl: data.result?.processedVideoUrl || URL.createObjectURL(uploadedVideo),
+          processedVideoUrl: data.result?.processedVideoUrl,
+          videoUrl: URL.createObjectURL(uploadedVideo),
           originalVideoUrl: URL.createObjectURL(uploadedVideo),
           subtitles: data.result?.subtitles || [],
           styleAnalysis: data.result?.styleAnalysis,
