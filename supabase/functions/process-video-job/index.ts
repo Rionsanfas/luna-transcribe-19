@@ -167,8 +167,7 @@ serve(async (req) => {
           .insert(subtitleInserts);
       }
 
-      // Create processed video with burned-in subtitles
-      const processedFileName = `${videoJob.id}/processed_${originalFilename}`;
+      // Save subtitles and SRT only (skip server-side FFmpeg burn-in)
       const srtFileName = `${videoJob.id}/subtitles.srt`;
       
       // Generate SRT file content
@@ -179,30 +178,15 @@ serve(async (req) => {
         .from('processed-videos')
         .upload(srtFileName, new TextEncoder().encode(srtContent), {
           contentType: 'text/plain',
-          upsert: false
+          upsert: true
         });
 
-      // Create processed video with burned-in subtitles using FFmpeg WASM
-      const processedVideoBuffer = await createVideoWithSubtitles(
-        videoBuffer, 
-        result.subtitles, 
-        result.styleAnalysis
-      );
-      
-      await supabase.storage
-        .from('processed-videos')
-        .upload(processedFileName, processedVideoBuffer, {
-          contentType: 'video/mp4',
-          upsert: false
-        });
-
-      // Update job as completed
+      // Mark job as completed (client will burn subtitles into the video)
       await supabase
         .from('video_jobs')
         .update({
           status: 'completed',
-          output_file_path: processedFileName,
-          subtitle_file_path: `${videoJob.id}/subtitles.srt`,
+          subtitle_file_path: srtFileName,
           progress_percentage: 100,
         })
         .eq('id', videoJob.id);
@@ -224,24 +208,18 @@ serve(async (req) => {
           description: `${processingType} processing (${fileSizeMB}MB)`
         });
 
-      // Get the processed video URL
-      const { data: processedVideoUrl } = supabase.storage
+      // Create a signed URL for the SRT file (valid for 7 days)
+      const { data: srtSignedUrl } = await supabase.storage
         .from('processed-videos')
-        .getPublicUrl(processedFileName);
-
-      // Get the SRT file URL  
-      const { data: srtUrl } = supabase.storage
-        .from('processed-videos')
-        .getPublicUrl(srtFileName);
+        .createSignedUrl(srtFileName, 60 * 60 * 24 * 7);
 
       return new Response(JSON.stringify({
         success: true,
         jobId: videoJob.id,
         status: 'completed',
         result: {
-          ...result,
-          processedVideoUrl: processedVideoUrl.publicUrl,
-          srtUrl: srtUrl.publicUrl
+          subtitles: result.subtitles,
+          srtUrl: srtSignedUrl?.signedUrl || null
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-
+import { renderVideoWithSubtitles } from "@/lib/renderSubtitledVideo";
 const Dashboard = () => {
   const { user, session, tokenBalance, refreshTokenBalance } = useAuth();
   const { toast } = useToast();
@@ -142,6 +142,7 @@ const Dashboard = () => {
       }
 
       if (data.success) {
+        // Initial results - show original while we prepare processed output
         setResults({
           jobId: data.jobId,
           processedVideoUrl: data.result?.processedVideoUrl,
@@ -155,8 +156,29 @@ const Dashboard = () => {
         // Refresh token balance
         await refreshTokenBalance();
 
+        // If server didn't return a processed video, burn subtitles client-side and upload
+        if (!data.result?.processedVideoUrl && Array.isArray(data.result?.subtitles)) {
+          try {
+            setJobStatus('Burning subtitles into video...');
+            const processedBlob = await renderVideoWithSubtitles(uploadedVideo, data.result.subtitles);
+            const processedPath = `${data.jobId}/processed_${uploadedVideo.name.replace(/\.[^/.]+$/, '.webm')}`;
+            const { error: uploadErr } = await supabase.storage
+              .from('processed-videos')
+              .upload(processedPath, processedBlob, { contentType: 'video/webm', upsert: true });
+            if (uploadErr) throw uploadErr;
+
+            const { data: signed } = await supabase.storage
+              .from('processed-videos')
+              .createSignedUrl(processedPath, 60 * 60 * 24 * 7);
+
+            setResults((prev: any) => ({ ...prev, processedVideoUrl: signed?.signedUrl }));
+          } catch (e: any) {
+            console.error('Client burn-in failed:', e);
+          }
+        }
+
         toast({
-          title: "✅ Subtitles generated and burned into video!",
+          title: "✅ Subtitled video ready!",
           description: `Your ${activeAction} is complete and saved to your History.`,
         });
       } else {
@@ -212,21 +234,42 @@ const Dashboard = () => {
           URL.revokeObjectURL(url);
         }
       } else {
-        // Download processed video from Supabase storage
-        const { data: videoData, error: videoError } = await supabase.storage
-          .from('processed-videos')
-          .download(`${results.jobId}/processed_${uploadedVideo?.name || 'video.mp4'}`);
-          
-        if (videoError) {
-          throw new Error('Processed video not found in storage');
+        // Prefer processedVideoUrl if available (may be a signed URL)
+        if (results.processedVideoUrl) {
+          const resp = await fetch(results.processedVideoUrl);
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `processed_video.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          // Fallback to downloading from storage using expected path
+          const webmPath = `${results.jobId}/processed_${uploadedVideo?.name.replace(/\.[^/.]+$/, '.webm')}`;
+          const mp4Path = `${results.jobId}/processed_${uploadedVideo?.name || 'video.mp4'}`;
+
+          let downloadRes = await supabase.storage
+            .from('processed-videos')
+            .download(webmPath);
+
+          if (downloadRes.error) {
+            downloadRes = await supabase.storage
+              .from('processed-videos')
+              .download(mp4Path);
+          }
+
+          if (downloadRes.error) {
+            throw new Error('Processed video not found in storage');
+          }
+
+          const url = URL.createObjectURL(downloadRes.data);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `processed_video.${format}`;
+          a.click();
+          URL.revokeObjectURL(url);
         }
-        
-        const url = URL.createObjectURL(videoData);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `processed_video.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
       }
 
       toast({
@@ -494,6 +537,8 @@ const Dashboard = () => {
                     <video 
                       src={results.processedVideoUrl || results.videoUrl} 
                       controls 
+                      playsInline
+                      preload="metadata"
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -502,38 +547,7 @@ const Dashboard = () => {
                   </p>
                 </div>
 
-                {/* Subtitles Preview */}
-                <div className="space-y-4">
-                  <h3 className="font-medium">Generated Subtitles</h3>
-                  <div className="bg-muted p-4 rounded-lg max-h-96 overflow-y-auto">
-                    {results.subtitles && results.subtitles.length > 0 ? (
-                      <div className="space-y-2">
-                        {results.subtitles.map((subtitle: any, index: number) => (
-                          <div key={index} className="text-sm border-b border-border pb-2">
-                            <div className="text-xs text-muted-foreground mb-1">
-                              {formatTimeForSRT(subtitle.start)} → {formatTimeForSRT(subtitle.end)}
-                            </div>
-                            <div>{subtitle.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground">No subtitles generated yet.</p>
-                    )}
-                  </div>
-                </div>
 
-                {/* Style Analysis for style matching */}
-                {activeAction === "style-matching" && results.styleAnalysis && (
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Style Analysis</h3>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <pre className="text-sm whitespace-pre-wrap">
-                        {JSON.stringify(results.styleAnalysis, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-                )}
               </div>
             </Card>
           </section>
