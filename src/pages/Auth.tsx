@@ -26,7 +26,7 @@ const Auth = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (!loading && user) {
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -101,7 +101,7 @@ const Auth = () => {
       } else {
         const { error } = await signIn(formData.email, formData.password);
         if (!error) {
-          navigate("/dashboard");
+          navigate("/dashboard", { replace: true });
         }
       }
     } catch (error) {

@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
-import { Upload, Play, Download, FileText, Languages, Palette, RefreshCw } from "lucide-react";
+import { Upload, Download, FileText, Languages, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TopNavigation } from "@/components/TopNavigation";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,9 +20,6 @@ const Dashboard = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
-  const [editedSubtitles, setEditedSubtitles] = useState<string>('');
-  const [isReprocessing, setIsReprocessing] = useState(false);
-  const [showSubtitleEditor, setShowSubtitleEditor] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState<string>('es');
 
   // Redirect to auth if not logged in
@@ -156,21 +151,12 @@ const Dashboard = () => {
           srtUrl: data.result?.srtUrl
         });
 
-        // Set initial edited subtitles with proper formatting
-        if (data.result?.subtitles && Array.isArray(data.result.subtitles)) {
-          const subtitleText = data.result.subtitles.map((s: any) => 
-            `${formatTimeForEdit(s.start)} --> ${formatTimeForEdit(s.end)}\n${s.text}`
-          ).join('\n\n');
-          setEditedSubtitles(subtitleText);
-          setShowSubtitleEditor(true);
-        }
-
         // Refresh token balance
         await refreshTokenBalance();
 
         toast({
-          title: "Processing complete!",
-          description: `Your ${activeAction} has been completed successfully.`,
+          title: "✅ Subtitles generated and burned into video!",
+          description: `Your ${activeAction} is complete and saved to your History.`,
         });
       } else {
         throw new Error(data.error || 'Processing failed');
@@ -186,66 +172,6 @@ const Dashboard = () => {
     } finally {
       setIsProcessing(false);
       setJobStatus('');
-    }
-  };
-
-  const handleApplyChanges = async () => {
-    if (!editedSubtitles || !results?.jobId) return;
-
-    setIsReprocessing(true);
-    try {
-      toast({
-        title: "Re-timing subtitles...",
-        description: "Using AI to sync your edited text with the audio. This may take a moment.",
-      });
-
-      // Extract just the text content for re-timing (remove timing info)
-      const textOnlyContent = editedSubtitles
-        .split('\n\n')
-        .map(block => {
-          const lines = block.trim().split('\n');
-          // Skip timing line, keep only text
-          return lines.length > 1 ? lines.slice(1).join(' ') : lines[0];
-        })
-        .filter(text => text.trim().length > 0)
-        .join('\n');
-
-      console.log('Sending text for re-timing:', textOnlyContent);
-
-      // Call reprocessing edge function with edited text for re-timing
-      const { data: reprocessData, error: reprocessError } = await supabase.functions.invoke('reprocess-subtitles', {
-        body: { 
-          jobId: results.jobId,
-          editedText: textOnlyContent
-        }
-      });
-
-      if (reprocessError) {
-        throw reprocessError;
-      }
-
-      // Update results with the new processed video
-      if (reprocessData?.processedVideoUrl) {
-        setResults(prevResults => ({
-          ...prevResults,
-          processedVideoUrl: reprocessData.processedVideoUrl,
-          videoUrl: reprocessData.processedVideoUrl,
-        }));
-      }
-
-      toast({
-        title: "✅ Your captions were applied and the video was saved to your History.",
-        description: "Your edits have been synced with the audio and burned into the video.",
-      });
-    } catch (error: any) {
-      console.error('Reprocessing error:', error);
-      toast({
-        title: "Re-timing failed",
-        description: error.message || "Failed to re-time subtitles with audio.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsReprocessing(false);
     }
   };
 
@@ -544,133 +470,71 @@ const Dashboard = () => {
 
         {/* Results Section */}
         {results && (
-          <section className="space-y-6">
-            <h2 className="text-2xl font-bold text-center">Results</h2>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Video Preview */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Processed Video with Burned Subtitles</h3>
-                <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                  <video
-                    src={results.processedVideoUrl || results.videoUrl}
-                    controls
-                    className="w-full h-full rounded-lg"
-                    onLoadedData={(e) => {
-                      const video = e.currentTarget;
-                      console.log(`Video loaded: ${video.duration}s duration, ${video.videoWidth}x${video.videoHeight}`);
-                    }}
-                    onError={(e) => {
-                      console.error('Video playback error:', e);
-                    }}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
+          <section className="max-w-4xl mx-auto">
+            <Card className="p-8">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-semibold">Your Video with AI Subtitles</h2>
+                  <div className="flex gap-2">
+                    <Button onClick={() => handleDownload('mp4')} variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Video
+                    </Button>
+                    <Button onClick={() => handleDownload('srt')} variant="outline">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download SRT
+                    </Button>
+                  </div>
                 </div>
-                {results.originalVideoUrl && results.processedVideoUrl !== results.originalVideoUrl && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium mb-2">Original Video (for comparison)</h4>
-                    <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
-                      <video
-                        src={results.originalVideoUrl}
-                        controls
-                        className="w-full h-full rounded-lg"
-                      >
-                        Your browser does not support the video tag.
-                      </video>
+
+                {/* Video Preview */}
+                <div className="space-y-3">
+                  <div className="aspect-video bg-muted rounded-lg overflow-hidden max-w-2xl mx-auto">
+                    <video 
+                      src={results.processedVideoUrl || results.videoUrl} 
+                      controls 
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <p className="text-center text-sm text-muted-foreground">
+                    Your video with AI-generated subtitles burned in
+                  </p>
+                </div>
+
+                {/* Subtitles Preview */}
+                <div className="space-y-4">
+                  <h3 className="font-medium">Generated Subtitles</h3>
+                  <div className="bg-muted p-4 rounded-lg max-h-96 overflow-y-auto">
+                    {results.subtitles && results.subtitles.length > 0 ? (
+                      <div className="space-y-2">
+                        {results.subtitles.map((subtitle: any, index: number) => (
+                          <div key={index} className="text-sm border-b border-border pb-2">
+                            <div className="text-xs text-muted-foreground mb-1">
+                              {formatTimeForSRT(subtitle.start)} → {formatTimeForSRT(subtitle.end)}
+                            </div>
+                            <div>{subtitle.text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">No subtitles generated yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Style Analysis for style matching */}
+                {activeAction === "style-matching" && results.styleAnalysis && (
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Style Analysis</h3>
+                    <div className="bg-muted p-4 rounded-lg">
+                      <pre className="text-sm whitespace-pre-wrap">
+                        {JSON.stringify(results.styleAnalysis, null, 2)}
+                      </pre>
                     </div>
                   </div>
                 )}
-              </Card>
-
-              {/* Editor Panel */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Subtitle Editor</h3>
-                <Tabs defaultValue="edit" className="space-y-4">
-                  <TabsList>
-                    <TabsTrigger value="edit">Edit</TabsTrigger>
-                    <TabsTrigger value="preview">Preview</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="edit" className="space-y-4">
-                    <Textarea
-                      className="h-48 resize-none"
-                      placeholder="Subtitles will appear here for editing..."
-                      value={editedSubtitles}
-                      onChange={(e) => setEditedSubtitles(e.target.value)}
-                    />
-                     <Button 
-                       onClick={handleApplyChanges}
-                       disabled={isReprocessing || !editedSubtitles.trim()}
-                       className="w-full"
-                     >
-                      {isReprocessing ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                          Updating Subtitles...
-                        </div>
-                      ) : (
-                        <>
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                          Apply Changes
-                        </>
-                      )}
-                    </Button>
-                    {results.styleAnalysis && (
-                      <div className="p-4 bg-muted rounded-lg">
-                        <h4 className="font-medium mb-2">Style Analysis:</h4>
-                        <p className="text-sm text-muted-foreground">{results.styleAnalysis}</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                  
-                  <TabsContent value="preview" className="space-y-4">
-                    <div className="h-48 p-4 border rounded-lg bg-muted overflow-y-auto">
-                      {Array.isArray(results.subtitles) ? (
-                        results.subtitles.map((subtitle: any, index: number) => (
-                          <div key={index} className="mb-3 p-2 bg-background rounded">
-                            <div className="text-xs text-muted-foreground">
-                              {subtitle.start}s - {subtitle.end}s
-                            </div>
-                            <div className="text-sm">{subtitle.text}</div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="whitespace-pre-wrap">{results.subtitles}</p>
-                      )}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </Card>
-            </div>
-
-            {/* Download Buttons */}
-            <div className="flex justify-center space-x-4">
-              <Button 
-                variant="outline" 
-                className="space-x-2"
-                onClick={() => handleDownload('mp4')}
-              >
-                <Download className="h-4 w-4" />
-                <span>Download MP4</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="space-x-2"
-                onClick={() => handleDownload('mov')}
-              >
-                <Download className="h-4 w-4" />
-                <span>Download MOV</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="space-x-2"
-                onClick={() => handleDownload('srt')}
-              >
-                <Download className="h-4 w-4" />
-                <span>Download SRT</span>
-              </Button>
-            </div>
+              </div>
+            </Card>
           </section>
         )}
       </main>
