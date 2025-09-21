@@ -70,8 +70,8 @@ serve(async (req) => {
     }
 
     // Calculate tokens needed based on file size (1 token = 10 MB)
-    // Round to 1 decimal place for fractional tokens
-    const tokensNeeded = Math.ceil((fileSizeMB / 10) * 10) / 10;
+    // Round to 1 decimal place for fractional tokens (exact logic requested)
+    const tokensNeeded = Math.round((fileSizeMB / 10) * 10) / 10;
     
     // Check if user has enough tokens
     if (profile.token_balance < tokensNeeded) {
@@ -167,37 +167,80 @@ serve(async (req) => {
           .insert(subtitleInserts);
       }
 
-      // Save subtitles and SRT only (skip server-side FFmpeg burn-in)
+      // After transcribe/translate/style-match: generate SRT, burn-in server-side, upload outputs
       const srtFileName = `${videoJob.id}/subtitles.srt`;
-      
-      // Generate SRT file content
+      const videoFileOutName = `${videoJob.id}/burned.mp4`;
+
+      // Generate SRT content
       const srtContent = generateSRTContent(result.subtitles);
-      
-      // Save SRT file
-      await supabase.storage
+
+      // Burn subtitles using FFmpeg WASM (ratio-aware)
+      let processedVideo: Uint8Array;
+      let burnLogs: string[] = [];
+      try {
+        const burn = await createVideoWithSubtitles(videoBuffer, result.subtitles, (result as any).styleAnalysis);
+        processedVideo = burn.processedVideo;
+        burnLogs = burn.logs;
+      } catch (burnErr) {
+        console.error('FFmpeg burn-in failed:', burnErr);
+        await supabase
+          .from('video_jobs')
+          .update({ status: 'failed', error_message: `FFmpeg burn-in failed: ${String(burnErr)}` })
+          .eq('id', videoJob.id);
+        return new Response(JSON.stringify({ error: `FFmpeg burn-in failed`, details: String(burnErr) }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Upload SRT file
+      const { error: srtUploadError } = await supabase.storage
         .from('processed-videos')
         .upload(srtFileName, new TextEncoder().encode(srtContent), {
           contentType: 'text/plain',
           upsert: true
         });
+      if (srtUploadError) {
+        console.error('SRT upload error:', srtUploadError);
+      }
 
-      // Mark job as completed (client will burn subtitles into the video)
+      // Upload burned video
+      const { error: videoUploadError } = await supabase.storage
+        .from('processed-videos')
+        .upload(videoFileOutName, processedVideo, {
+          contentType: 'video/mp4',
+          upsert: true
+        });
+
+      if (videoUploadError) {
+        console.error('Burned video upload error:', videoUploadError);
+        await supabase
+          .from('video_jobs')
+          .update({ status: 'failed', error_message: `Upload failed: ${videoUploadError.message}` })
+          .eq('id', videoJob.id);
+        return new Response(JSON.stringify({ error: 'Failed to upload processed video', details: videoUploadError.message, ffmpegLogs: burnLogs.slice(-200) }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Mark job as completed and set file paths
       await supabase
         .from('video_jobs')
         .update({
           status: 'completed',
           subtitle_file_path: srtFileName,
+          output_file_path: videoFileOutName,
           progress_percentage: 100,
         })
         .eq('id', videoJob.id);
 
-      // Deduct tokens from user balance
+      // Deduct tokens and record transaction
       await supabase
         .from('profiles')
         .update({ token_balance: profile.token_balance - tokensNeeded })
         .eq('user_id', user.id);
 
-      // Record token transaction
       await supabase
         .from('token_transactions')
         .insert({
@@ -208,10 +251,14 @@ serve(async (req) => {
           description: `${processingType} processing (${fileSizeMB}MB)`
         });
 
-      // Create a signed URL for the SRT file (valid for 7 days)
+      // Create signed URLs (valid 7 days)
       const { data: srtSignedUrl } = await supabase.storage
         .from('processed-videos')
         .createSignedUrl(srtFileName, 60 * 60 * 24 * 7);
+
+      const { data: videoSignedUrl } = await supabase.storage
+        .from('processed-videos')
+        .createSignedUrl(videoFileOutName, 60 * 60 * 24 * 7);
 
       return new Response(JSON.stringify({
         success: true,
@@ -219,7 +266,8 @@ serve(async (req) => {
         status: 'completed',
         result: {
           subtitles: result.subtitles,
-          srtUrl: srtSignedUrl?.signedUrl || null
+          srtUrl: srtSignedUrl?.signedUrl || null,
+          videoUrl: videoSignedUrl?.signedUrl || null
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -323,6 +371,7 @@ async function processTranslation(videoBuffer: Uint8Array, targetLanguage: strin
 
   // Language code to full name mapping
   const languageMap: Record<string, string> = {
+    'en': 'English',
     'es': 'Spanish',
     'fr': 'French', 
     'de': 'German',
@@ -358,21 +407,21 @@ async function processTranslation(videoBuffer: Uint8Array, targetLanguage: strin
         'Authorization': `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a professional translator. Translate the text to ${targetLanguageName}. Return only the translated text, nothing else. Preserve the timing and flow appropriate for subtitles.`
-          },
-          {
-            role: 'user',
-            content: subtitle.text
-          }
-        ],
-        max_tokens: 500,
-        temperature: 0.1
-      }),
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional translator. Translate the text to the target language preserving timing and flow appropriate for subtitles. Return only the translated text, nothing else.'
+            },
+            {
+              role: 'user',
+              content: `Translate to ${targetLanguageName}:\n${subtitle.text}`
+            }
+          ],
+          max_tokens: 500,
+          temperature: 0.1
+        }),
     });
 
     if (!response.ok) {
@@ -404,9 +453,9 @@ async function processStyleMatching(videoBuffer: Uint8Array, imageBuffer: Uint8A
   // First get transcription
   const transcription = await processTranscription(videoBuffer);
 
-  // Analyze style from reference image using GPT-4 Vision
+  // Analyze style from reference image - strict JSON response
   const base64Image = btoa(String.fromCharCode(...imageBuffer));
-  
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -418,21 +467,13 @@ async function processStyleMatching(videoBuffer: Uint8Array, imageBuffer: Uint8A
       messages: [
         {
           role: 'system',
-          content: 'You are a subtitle style analyzer. Analyze the subtitle style in the image and describe the font, color, position, and effects.'
+          content: 'You are a subtitle style analyst. Analyze the subtitle style in the provided image and return VALID JSON ONLY with keys: fontFamily, fontVariant, fontSize, textColor, backgroundColor, backgroundOpacity, strokeWidth, strokeColor, textShadow, position (bottom|top|center), lineHeight, maxWidthPercent, animation (none|fade|pop|slide), activeWordHighlight, activeWordColor. For fontFamily return a Google Font or Bunny Font name when possible. No extra text.'
         },
         {
           role: 'user',
           content: [
-            {
-              type: 'text',
-              text: 'Analyze the subtitle style in this image and provide styling information.'
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
+            { type: 'text', text: 'Analyze the subtitle style in this image and return only JSON.' },
+            { type: 'image_url', image_url: { url: `data:image/png;base64,${base64Image}` } }
           ]
         }
       ],
@@ -446,11 +487,21 @@ async function processStyleMatching(videoBuffer: Uint8Array, imageBuffer: Uint8A
   }
 
   const result = await response.json();
-  const styleAnalysis = result.choices[0].message.content;
+  const rawContent: string = result.choices?.[0]?.message?.content || '';
+  console.log('Style analysis raw content:', rawContent);
+
+  let parsed: any | null = null;
+  try {
+    // Strip code fences if present
+    const cleaned = rawContent.trim().replace(/^```(json)?/i, '').replace(/```$/,'').trim();
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    console.error('Failed to parse style analysis JSON. Raw output kept for logs. Error:', e);
+  }
 
   return {
     subtitles: transcription.subtitles,
-    styleAnalysis: styleAnalysis
+    styleAnalysis: parsed ? JSON.stringify(parsed) : null
   };
 }
 
@@ -472,68 +523,150 @@ function formatSRTTime(seconds: number): string {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }
 
-async function createVideoWithSubtitles(videoBuffer: Uint8Array, subtitles: any[], styleAnalysis?: string): Promise<Uint8Array> {
+async function createVideoWithSubtitles(
+  videoBuffer: Uint8Array,
+  subtitles: any[],
+  styleAnalysis?: string
+): Promise<{ processedVideo: Uint8Array; logs: string[]; width: number; height: number }> {
   console.log(`Processing video with ${subtitles.length} subtitle segments using FFmpeg WASM`);
-  
+
+  const logs: string[] = [];
   try {
     // Initialize FFmpeg WASM
     const ffmpeg = new FFmpeg();
-    
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.4/dist/umd';
     ffmpeg.on('log', ({ message }) => {
+      logs.push(message);
       console.log('FFmpeg Log:', message);
     });
-    
-    // Load FFmpeg
+
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
     });
-    
-    // Write input video to FFmpeg virtual filesystem
+
+    // Write input video
     await ffmpeg.writeFile('input.mp4', await fetchFile(new Blob([videoBuffer])));
-    
-    // Generate SRT content and write to filesystem
+
+    // Probe to get width/height
+    async function probeAndGetSize(): Promise<{ width: number; height: number }> {
+      let probeOutput = '';
+      ffmpeg.on('log', ({ message }) => { probeOutput += message + '\n'; });
+      try {
+        await ffmpeg.exec(['-hide_banner', '-i', 'input.mp4', '-f', 'null', '-']);
+      } catch (_) { /* Expected to error due to -f null; we only need logs */ }
+      const match = probeOutput.match(/(\d{2,5})x(\d{2,5})/);
+      const width = match ? parseInt(match[1], 10) : 1080;
+      const height = match ? parseInt(match[2], 10) : 1080;
+      return { width, height };
+    }
+
+    const { width, height } = await probeAndGetSize();
+
+    // Prepare subtitles files (SRT or ASS)
+    const defaultStyle = getDefaultSubtitleStyle();
+    const parsedStyle = styleAnalysis ? parseStyleAnalysis(styleAnalysis) : defaultStyle;
+
+    // Ratio-aware sizing
+    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    const fontSizePx = clamp(parsedStyle.fontSize || Math.round(height * 0.045), 16, Math.max(28, Math.round(height * 0.07)));
+    const marginV = clamp(parsedStyle.marginV || Math.round(height * 0.05), 10, Math.round(height * 0.1));
+
+    // Write SRT for upload and as fallback
     const srtContent = generateSRTContent(subtitles);
     await ffmpeg.writeFile('subtitles.srt', srtContent);
-    
-    // Parse style analysis for subtitle styling
-    let subtitleStyle = getDefaultSubtitleStyle();
+
+    // If we have style JSON, build an ASS file for richer styling
+    let useAss = false;
     if (styleAnalysis) {
-      subtitleStyle = parseStyleAnalysis(styleAnalysis);
+      useAss = true;
+      const ass = buildAssFromStyle(parsedStyle, width, height, fontSizePx, marginV);
+      await ffmpeg.writeFile('subtitles.ass', ass);
     }
-    
-    // Create subtitle filter with dynamic styling
-    const subtitleFilter = `subtitles=subtitles.srt:force_style='FontName=${subtitleStyle.fontFamily},FontSize=${subtitleStyle.fontSize},PrimaryColour=${subtitleStyle.primaryColor},OutlineColour=${subtitleStyle.outlineColor},BackColour=${subtitleStyle.backgroundColor},Bold=${subtitleStyle.bold ? 1 : 0},Outline=${subtitleStyle.outline},MarginV=${subtitleStyle.marginV}'`;
-    
-    // Run FFmpeg to burn subtitles
+
+    const subtitleFilter = useAss
+      ? `subtitles=subtitles.ass`
+      : `subtitles=subtitles.srt:force_style='FontName=${parsedStyle.fontFamily},FontSize=${fontSizePx},PrimaryColour=${parsedStyle.primaryColor},OutlineColour=${parsedStyle.outlineColor},BackColour=${parsedStyle.backgroundColor},Bold=${parsedStyle.bold ? 1 : 0},Outline=${parsedStyle.outline},MarginV=${marginV}'`;
+
+    // Burn subtitles
     await ffmpeg.exec([
       '-i', 'input.mp4',
       '-vf', subtitleFilter,
       '-c:a', 'copy',
       '-preset', 'ultrafast',
-      '-y',
-      'output.mp4'
+      '-y', 'output.mp4'
     ]);
-    
-    // Read the processed video
+
+    // Validate output has duration > 0
+    let durationSec = 0;
+    let validateLogs = '';
+    ffmpeg.on('log', ({ message }) => { validateLogs += message + '\n'; });
+    try {
+      await ffmpeg.exec(['-hide_banner', '-i', 'output.mp4', '-f', 'null', '-']);
+    } catch (_) { /* ignore */ }
+    const durMatch = validateLogs.match(/Duration: (\d{2}):(\d{2}):(\d{2})\.(\d{2})/);
+    if (durMatch) {
+      const h = parseInt(durMatch[1]);
+      const m = parseInt(durMatch[2]);
+      const s = parseInt(durMatch[3]);
+      durationSec = h * 3600 + m * 60 + s;
+    }
+
+    if (durationSec <= 0) {
+      console.error('Generated video failed validation. ffmpeg logs:', logs.join('\n'));
+      throw new Error('FFmpeg validation failed: output video has zero or unknown duration.');
+    }
+
     const data = await ffmpeg.readFile('output.mp4');
     const processedVideo = new Uint8Array(data as ArrayBuffer);
-    
-    // Validate video output
-    const isValid = await validateVideoOutput(ffmpeg, 'output.mp4');
-    if (!isValid) {
-      console.error('Generated video is invalid, falling back to original');
-      return videoBuffer;
-    }
-    
-    console.log(`Successfully processed video: ${processedVideo.length} bytes`);
-    return processedVideo;
-    
+
+    return { processedVideo, logs, width, height };
   } catch (error) {
-    console.error("Error in createVideoWithSubtitles:", error);
-    return videoBuffer; // Return original if all fails
+    logs.push(`Error in createVideoWithSubtitles: ${String(error?.message || error)}`);
+    console.error('Error in createVideoWithSubtitles:', error);
+    throw new Error(logs.join('\n'));
   }
+}
+
+// Build a minimal ASS file from parsed style
+function buildAssFromStyle(style: any, width: number, height: number, fontSizePx: number, marginV: number) {
+  const assColor = (hex: string) => cssHexToAssColor(hex);
+  const backColor = (hex: string, opacity?: number) => cssHexToAssColorWithAlpha(hex, opacity);
+
+  const primary = style.primaryColor || assColor('#FFFFFF');
+  const outline = style.outlineColor || assColor('#000000');
+  const back = style.backgroundColor || backColor('#000000', 0.6);
+  const bold = style.bold ? -1 : 0;
+  const outlineW = style.outline ?? 2;
+  const alignment = style.position === 'top' ? 8 : style.position === 'center' ? 5 : 2; // 2 bottom-center
+
+  return `
+[Script Info]
+ScriptType: v4.00+
+PlayResX: ${width}
+PlayResY: ${height}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,${style.fontFamily || 'Arial'},${fontSizePx},${primary},&H000000,${outline},${back},${bold},0,0,0,100,100,0,0,1,${outlineW},0,${alignment},20,20,${marginV},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${subtitles.map((s, idx) => `Dialogue: 0,${formatSRTTime(s.start || idx * 2).replace(',', '.')},${formatSRTTime(s.end || (idx + 1) * 2).replace(',', '.')},Default,,0,0,${marginV},,${(s.text || '').replace(/\n/g, '\\N')}`).join('\n')}
+`;}
+
+// Color helpers for ASS
+function cssHexToAssColor(hex: string) {
+  const m = /#?([0-9a-fA-F]{6})/.exec(hex || '')?.[1] || 'FFFFFF';
+  const r = m.slice(0,2), g = m.slice(2,4), b = m.slice(4,6);
+  return `&H${b}${g}${r}`; // BGR
+}
+function cssHexToAssColorWithAlpha(hex: string, opacity?: number) {
+  const m = /#?([0-9a-fA-F]{6})/.exec(hex || '')?.[1] || '000000';
+  const r = m.slice(0,2), g = m.slice(2,4), b = m.slice(4,6);
+  const a = typeof opacity === 'number' ? Math.round((1 - Math.max(0, Math.min(1, opacity))) * 255) : 128; // default 0.5
+  const aa = a.toString(16).padStart(2, '0').toUpperCase();
+  return `&H${aa}${b}${g}${r}`; // A + BGR
 }
 
 // Validate video output using FFmpeg probe
@@ -549,65 +682,42 @@ async function validateVideoOutput(ffmpeg: FFmpeg, filename: string): Promise<bo
   }
 }
 
-// Default subtitle style configuration
 function getDefaultSubtitleStyle() {
   return {
     fontFamily: 'Arial',
     fontSize: 24,
-    primaryColor: '&Hffffff', // White
-    outlineColor: '&H000000', // Black
-    backgroundColor: '&H80000000', // Semi-transparent black
+    primaryColor: cssHexToAssColor('#FFFFFF'), // White
+    outlineColor: cssHexToAssColor('#000000'), // Black
+    backgroundColor: cssHexToAssColorWithAlpha('#000000', 0.5), // Semi-transparent black
     bold: true,
     outline: 2,
     marginV: 30
   };
 }
 
-// Parse style analysis from GPT-4 Vision to extract styling information
+// Parse style analysis JSON to extract styling information
 function parseStyleAnalysis(styleAnalysis: string) {
   const style = getDefaultSubtitleStyle();
-  
+  if (!styleAnalysis) return style;
+
   try {
-    // Extract font size
-    const fontSizeMatch = styleAnalysis.match(/font.{0,20}size.{0,20}(\d+)/i);
-    if (fontSizeMatch) {
-      style.fontSize = Math.max(16, Math.min(48, parseInt(fontSizeMatch[1])));
+    const raw = JSON.parse(styleAnalysis);
+
+    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Number(n)));
+
+    if (raw.fontFamily) style.fontFamily = String(raw.fontFamily);
+    if (raw.fontSize) style.fontSize = clamp(raw.fontSize, 12, 96);
+    if (raw.textColor) style.primaryColor = cssHexToAssColor(String(raw.textColor));
+    if (raw.strokeColor) style.outlineColor = cssHexToAssColor(String(raw.strokeColor));
+    if (raw.backgroundColor) style.backgroundColor = cssHexToAssColorWithAlpha(String(raw.backgroundColor), typeof raw.backgroundOpacity === 'number' ? raw.backgroundOpacity : 0.6);
+    if (raw.strokeWidth) style.outline = clamp(raw.strokeWidth, 0, 8);
+    if (raw.position) {
+      const pos = String(raw.position).toLowerCase();
+      style.marginV = pos === 'top' ? 10 : pos === 'center' ? 50 : 30;
     }
-    
-    // Extract color information
-    const colorMatches = styleAnalysis.match(/color.{0,30}(white|black|yellow|red|blue|green)/i);
-    if (colorMatches) {
-      const color = colorMatches[1].toLowerCase();
-      switch (color) {
-        case 'white': style.primaryColor = '&Hffffff'; break;
-        case 'black': style.primaryColor = '&H000000'; break;
-        case 'yellow': style.primaryColor = '&H00ffff'; break;
-        case 'red': style.primaryColor = '&H0000ff'; break;
-        case 'blue': style.primaryColor = '&Hff0000'; break;
-        case 'green': style.primaryColor = '&H00ff00'; break;
-      }
-    }
-    
-    // Extract font family
-    const fontFamilyMatch = styleAnalysis.match(/font.{0,20}(arial|helvetica|times|georgia|verdana)/i);
-    if (fontFamilyMatch) {
-      style.fontFamily = fontFamilyMatch[1];
-    }
-    
-    // Extract position information
-    const positionMatch = styleAnalysis.match(/(bottom|top|center).{0,20}position/i);
-    if (positionMatch) {
-      const position = positionMatch[1].toLowerCase();
-      switch (position) {
-        case 'top': style.marginV = 10; break;
-        case 'center': style.marginV = 50; break;
-        case 'bottom': style.marginV = 30; break;
-      }
-    }
-    
   } catch (error) {
-    console.error('Error parsing style analysis:', error);
+    console.error('Error parsing style analysis JSON:', error);
   }
-  
+
   return style;
 }
