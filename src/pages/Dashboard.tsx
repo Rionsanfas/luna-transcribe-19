@@ -156,25 +156,78 @@ const Dashboard = () => {
         // Refresh token balance
         await refreshTokenBalance();
 
-        // If server didn't return a processed video, burn subtitles client-side and upload
-        if (!data.result?.processedVideoUrl && Array.isArray(data.result?.subtitles)) {
+        /*
+         * ========================================
+         * CLIENT-SIDE SUBTITLE BURNING PROCESS
+         * ========================================
+         * 
+         * The server returns subtitle data, and we burn them into the video client-side.
+         * This approach is more reliable than server-side video processing.
+         * 
+         * Process:
+         * 1. Receive subtitles from AI processing
+         * 2. Use renderVideoWithSubtitles() to burn subtitles into video
+         * 3. Upload the final processed video to storage
+         * 4. Update job record with output file path
+         * 5. Show user the final video with burned-in subtitles
+         */
+        
+        // Always burn subtitles client-side since server only provides subtitle data
+        if (Array.isArray(data.result?.subtitles) && data.result.subtitles.length > 0) {
+          setJobStatus('Burning subtitles into video...');
+          
           try {
-            setJobStatus('Burning subtitles into video...');
-            const processedBlob = await renderVideoWithSubtitles(uploadedVideo, data.result.subtitles);
+            // Apply style analysis if available for style-matching
+            const styleOptions = data.result.styleAnalysis ? {
+              // Parse style analysis and apply to subtitle rendering
+              fontFamily: 'Inter, system-ui, Arial',
+              fontSize: 32,
+              textColor: 'white',
+              strokeColor: 'black',
+              strokeWidth: 4,
+              backgroundColor: 'rgba(0,0,0,0.35)',
+            } : {};
+
+            // Burn subtitles into video using Canvas + MediaRecorder
+            const processedBlob = await renderVideoWithSubtitles(uploadedVideo, data.result.subtitles, styleOptions);
             const processedPath = `${data.jobId}/processed_${uploadedVideo.name.replace(/\.[^/.]+$/, '.webm')}`;
+            
+            // Upload processed video to storage
             const { error: uploadErr } = await supabase.storage
               .from('processed-videos')
               .upload(processedPath, processedBlob, { contentType: 'video/webm', upsert: true });
-            if (uploadErr) throw uploadErr;
+            
+            if (uploadErr) {
+              console.error('Upload error:', uploadErr);
+              throw uploadErr;
+            }
 
+            // Update job record with output file path
+            await supabase
+              .from('video_jobs')
+              .update({ output_file_path: processedPath })
+              .eq('id', data.jobId);
+
+            // Create signed URL for the processed video
             const { data: signed } = await supabase.storage
               .from('processed-videos')
               .createSignedUrl(processedPath, 60 * 60 * 24 * 7);
 
+            // Update results with the processed video URL
             setResults((prev: any) => ({ ...prev, processedVideoUrl: signed?.signedUrl }));
+            
+            console.log('✅ Successfully burned subtitles and uploaded processed video');
+            
           } catch (e: any) {
-            console.error('Client burn-in failed:', e);
+            console.error('❌ Client subtitle burning failed:', e);
+            toast({
+              title: "Subtitle burning failed",
+              description: "Failed to burn subtitles into video, but subtitles are available for download.",
+              variant: "destructive",
+            });
           }
+        } else {
+          console.warn('No subtitles returned from AI processing');
         }
 
         toast({

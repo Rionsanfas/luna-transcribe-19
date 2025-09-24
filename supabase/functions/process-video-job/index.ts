@@ -1,8 +1,35 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// FFmpeg WASM doesn't work in Deno due to Worker limitations
-// We'll use client-side processing instead
+
+/*
+ * ========================================
+ * AI SUBTITLE PROCESSING SYSTEM - REQUIREMENTS
+ * ========================================
+ * 
+ * CORE FUNCTIONALITY:
+ * This edge function processes videos to generate subtitles and returns them to the client.
+ * The client-side will then burn the subtitles into the video using Canvas + MediaRecorder.
+ * 
+ * WORKFLOW:
+ * 1. User uploads video → AI generates subtitles → Client burns subtitles into video
+ * 2. Process: Transcription/Translation/Style-matching → Return subtitles data → Client rendering
+ * 
+ * AI PROCESSING REQUIREMENTS:
+ * - Use OpenAI Whisper (whisper-1) for accurate transcription with word-level timestamps
+ * - Use gpt-4o-mini for translation with low temperature (0.1) for consistency
+ * - Use gpt-4o-mini for style analysis with strict JSON output format
+ * - Always return subtitles array with: {start: number, end: number, text: string}
+ * 
+ * SUBTITLE BURNING PROCESS:
+ * - Server generates SRT file and subtitle data
+ * - Client receives subtitle data and burns them into video using renderVideoWithSubtitles()
+ * - Final video with burned-in subtitles is uploaded back to storage
+ * - User gets both SRT file and video with burned subtitles
+ * 
+ * CRITICAL: NO SERVER-SIDE VIDEO PROCESSING
+ * FFmpeg/WASM doesn't work in Deno runtime, so all video processing happens client-side
+ */
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -167,70 +194,30 @@ serve(async (req) => {
           .insert(subtitleInserts);
       }
 
-      // After transcribe/translate/style-match: generate SRT, burn-in server-side, upload outputs
+      // Generate SRT content and upload to storage
       const srtFileName = `${videoJob.id}/subtitles.srt`;
-      const videoFileOutName = `${videoJob.id}/burned.mp4`;
-
-      // Generate SRT content
       const srtContent = generateSRTContent(result.subtitles);
 
-      // Burn subtitles using FFmpeg WASM (ratio-aware)
-      let processedVideo: Uint8Array;
-      let burnLogs: string[] = [];
-      try {
-        const burn = await createVideoWithSubtitles(videoBuffer, result.subtitles, (result as any).styleAnalysis);
-        processedVideo = burn.processedVideo;
-        burnLogs = burn.logs;
-      } catch (burnErr) {
-        console.error('FFmpeg burn-in failed:', burnErr);
-        await supabase
-          .from('video_jobs')
-          .update({ status: 'failed', error_message: `FFmpeg burn-in failed: ${String(burnErr)}` })
-          .eq('id', videoJob.id);
-        return new Response(JSON.stringify({ error: `FFmpeg burn-in failed`, details: String(burnErr) }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Upload SRT file
+      // Upload SRT file to storage
       const { error: srtUploadError } = await supabase.storage
         .from('processed-videos')
         .upload(srtFileName, new TextEncoder().encode(srtContent), {
           contentType: 'text/plain',
           upsert: true
         });
+      
       if (srtUploadError) {
         console.error('SRT upload error:', srtUploadError);
+        // Continue without failing - SRT can be generated client-side as fallback
       }
 
-      // Upload burned video
-      const { error: videoUploadError } = await supabase.storage
-        .from('processed-videos')
-        .upload(videoFileOutName, processedVideo, {
-          contentType: 'video/mp4',
-          upsert: true
-        });
-
-      if (videoUploadError) {
-        console.error('Burned video upload error:', videoUploadError);
-        await supabase
-          .from('video_jobs')
-          .update({ status: 'failed', error_message: `Upload failed: ${videoUploadError.message}` })
-          .eq('id', videoJob.id);
-        return new Response(JSON.stringify({ error: 'Failed to upload processed video', details: videoUploadError.message, ffmpegLogs: burnLogs.slice(-200) }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Mark job as completed and set file paths
+      // Mark job as completed with subtitle data
+      // NOTE: Client will handle video processing and upload the final result
       await supabase
         .from('video_jobs')
         .update({
           status: 'completed',
           subtitle_file_path: srtFileName,
-          output_file_path: videoFileOutName,
           progress_percentage: 100,
         })
         .eq('id', videoJob.id);
@@ -251,23 +238,20 @@ serve(async (req) => {
           description: `${processingType} processing (${fileSizeMB}MB)`
         });
 
-      // Create signed URLs (valid 7 days)
+      // Create signed URL for SRT file
       const { data: srtSignedUrl } = await supabase.storage
         .from('processed-videos')
         .createSignedUrl(srtFileName, 60 * 60 * 24 * 7);
 
-      const { data: videoSignedUrl } = await supabase.storage
-        .from('processed-videos')
-        .createSignedUrl(videoFileOutName, 60 * 60 * 24 * 7);
-
+      // Return subtitles data for client-side video processing
       return new Response(JSON.stringify({
         success: true,
         jobId: videoJob.id,
         status: 'completed',
         result: {
-          subtitles: result.subtitles,
-          srtUrl: srtSignedUrl?.signedUrl || null,
-          videoUrl: videoSignedUrl?.signedUrl || null
+          subtitles: result.subtitles, // Client will use this to burn subtitles into video
+          styleAnalysis: (result as any).styleAnalysis || null, // Style data for client rendering
+          srtUrl: srtSignedUrl?.signedUrl || null
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -523,72 +507,31 @@ function formatSRTTime(seconds: number): string {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
 }
 
-async function createVideoWithSubtitles(
-  videoBuffer: Uint8Array,
-  subtitles: any[],
-  styleAnalysis?: string
-): Promise<{ processedVideo: Uint8Array; logs: string[]; width: number; height: number }> {
-  console.log(`Processing video with ${subtitles.length} subtitle segments - returning original video for client-side processing`);
-
-  const logs: string[] = [];
-  
-  // Since FFmpeg WASM doesn't work in Deno due to Worker limitations,
-  // we'll return the original video and let the client handle subtitle burning
-  // This provides a more reliable solution that works across all environments
-  
-  // Simulate video dimensions (actual dimensions would be parsed by client)
-  const width = 1280;
-  const height = 720;
-  
-  logs.push(`Video processing skipped - client-side processing preferred`);
-  logs.push(`Returning original video with ${subtitles.length} subtitle segments`);
-  
-  return {
-    processedVideo: videoBuffer, // Return original video
-    logs,
-    width,
-    height
-}
-}
-
-// Helper functions for client-side processing
-
-function getDefaultSubtitleStyle() {
-  return {
-    fontFamily: 'Arial',
-    fontSize: 24,
-    primaryColor: cssHexToAssColor('#FFFFFF'), // White
-    outlineColor: cssHexToAssColor('#000000'), // Black
-    backgroundColor: cssHexToAssColorWithAlpha('#000000', 0.5), // Semi-transparent black
-    bold: true,
-    outline: 2,
-    marginV: 30
-  };
-}
-
-// Parse style analysis JSON to extract styling information
-function parseStyleAnalysis(styleAnalysis: string) {
-  const style = getDefaultSubtitleStyle();
-  if (!styleAnalysis) return style;
-
-  try {
-    const raw = JSON.parse(styleAnalysis);
-
-    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, Number(n)));
-
-    if (raw.fontFamily) style.fontFamily = String(raw.fontFamily);
-    if (raw.fontSize) style.fontSize = clamp(raw.fontSize, 12, 96);
-    if (raw.textColor) style.primaryColor = cssHexToAssColor(String(raw.textColor));
-    if (raw.strokeColor) style.outlineColor = cssHexToAssColor(String(raw.strokeColor));
-    if (raw.backgroundColor) style.backgroundColor = cssHexToAssColorWithAlpha(String(raw.backgroundColor), typeof raw.backgroundOpacity === 'number' ? raw.backgroundOpacity : 0.6);
-    if (raw.strokeWidth) style.outline = clamp(raw.strokeWidth, 0, 8);
-    if (raw.position) {
-      const pos = String(raw.position).toLowerCase();
-      style.marginV = pos === 'top' ? 10 : pos === 'center' ? 50 : 30;
-    }
-  } catch (error) {
-    console.error('Error parsing style analysis JSON:', error);
-  }
-
-  return style;
-}
+/*
+ * ========================================
+ * CLIENT-SIDE VIDEO PROCESSING EXPLANATION
+ * ========================================
+ * 
+ * This edge function does NOT process videos server-side because:
+ * 1. FFmpeg WASM requires Web Workers which don't work in Deno runtime
+ * 2. Server-side video processing is resource-intensive and unreliable
+ * 3. Client-side processing provides better performance and reliability
+ * 
+ * INSTEAD, the workflow is:
+ * 1. Server: Generate subtitles using AI (Whisper + GPT)
+ * 2. Server: Return subtitle data + style analysis to client
+ * 3. Client: Use renderVideoWithSubtitles() to burn subtitles into video
+ * 4. Client: Upload the final processed video back to storage
+ * 
+ * The client-side renderVideoWithSubtitles() function uses:
+ * - Canvas API to overlay subtitles on video frames
+ * - MediaRecorder to capture the canvas output as video
+ * - Proper text wrapping, positioning, and styling
+ * - Support for custom fonts, colors, backgrounds, and animations
+ * 
+ * This approach ensures:
+ * - Reliable video processing across all browsers
+ * - Better performance than server-side processing
+ * - Full control over subtitle styling and positioning
+ * - No dependency on server-side video processing libraries
+ */
