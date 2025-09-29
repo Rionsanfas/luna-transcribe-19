@@ -1,0 +1,8 @@
+-- Test migration to verify GitHub Actions and Supabase integration
+CREATE TABLE IF NOT EXISTS workflow_test (
+  id SERIAL PRIMARY KEY,
+  message TEXT DEFAULT 'Workflow works!'
+);
+
+-- Insert a sample row for confirmation
+INSERT INTO workflow_test (message) VALUES ('Hello from GitHub CI/CD!');
